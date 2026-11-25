@@ -21,9 +21,12 @@ glob yaml: any;
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),
      errors: list[str] = [];
 
-with entry {
+"""PyYAML, loaded when main runs rather than when the module is: the pytools program starts
+every module it holds, and the other tools it runs have no use for PyYAML."""
+def _load_yaml -> any {
     try {
         import yaml;
+        return yaml;
     } except ImportError {
         sys.exit("lint_skills.jac requires PyYAML: neojac install");
     }
@@ -106,6 +109,7 @@ def check_settings {
 }
 
 def main -> int {
+    yaml = _load_yaml();
     skills: list[Path] = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
         + sorted(ROOT.glob(".agents/skills/*/SKILL.md"));
     commands: list[Path] = sorted((ROOT / ".claude" / "commands").glob("*.md"));

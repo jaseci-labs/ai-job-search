@@ -242,7 +242,6 @@ def clean_html(markup: str) -> tuple[str, dict[str, any]] {
     stack: list[str] = [];
     nav_at: set[int] = set();
     hidden_at: int | None = None;
-    pos: int = 0;
 
     def collect(found: re.Match[str]) -> str {
         inner: str = re.sub("<!--|-->", " ", found.group(0));
@@ -273,15 +272,18 @@ def clean_html(markup: str) -> tuple[str, dict[str, any]] {
     }
 
     markup = DROP_BLOCKS.sub(collect, COMMENT.sub(collect, PRESTRIP.sub(" ", markup)));
-    for m in TAG.finditer(markup) {
-        emit(markup[pos:m.start()]);
-        pos = m.end();
-        name: str = m.group(2).lower();
-        raw_attrs: str = m.group(3);
+    # One split, not a slice of `markup` per tag: [text, closing slash, name, attributes, text,
+    # ...]. A native program slicing a long non-ASCII string between slices of other strings
+    # finds each offset again from the start, which made this loop quadratic.
+    pieces: list[str] = TAG.split(markup);
+    for at in range(0, len(pieces) - 1, 4) {
+        emit(pieces[at]);
+        name: str = pieces[at + 2].lower();
+        raw_attrs: str = pieces[at + 3];
         if name in BLOCK {
             emit("\n");
         }
-        if m.group(1) {
+        if pieces[at + 1] {
             if name in stack {
                 pop_to(len(stack) - 1 - stack[::-1].index(name));
             }
@@ -313,7 +315,7 @@ def clean_html(markup: str) -> tuple[str, dict[str, any]] {
             hidden_at = len(stack) - 1;
         }
     }
-    emit(markup[pos:]);
+    emit(pieces[-1]);
     if hidden_at is not None {
         flush_hidden();
     }

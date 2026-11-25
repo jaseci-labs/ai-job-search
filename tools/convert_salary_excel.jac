@@ -19,8 +19,7 @@ Expected Excel format:
 import argparse, json, math, os, re, sys;
 import from pathlib { Path }
 
-glob openpyxl: any = None,
-     COMPANY_PATTERNS: set[str] = {"firma", "company", "virksomhed", "employer", "arbejdsgiver"},
+glob COMPANY_PATTERNS: set[str] = {"firma", "company", "virksomhed", "employer", "arbejdsgiver"},
      CITY_PATTERNS: set[str] = {"by", "city", "kommune", "location", "lokation", "sted"},
      COUNT_PATTERNS: set[str] = {"antal", "count", "number", "n", "employees", "medarbejdere"},
      INDEX_PATTERNS: set[str] = {
@@ -45,10 +44,16 @@ glob openpyxl: any = None,
      DEFAULT_CATEGORY: str = "all_employees",
      WORD_CHAR: str = "[a-zæøåöäü0-9]";
 
-with entry {
+"""openpyxl, or None when it is not installed; loaded when main runs rather than when the module
+is: the pytools program starts every module it holds, and openpyxl takes longer to load than
+another tool's whole run."""
+def _load_openpyxl -> any {
     try {
         import openpyxl;
-    } except ImportError {}
+        return openpyxl;
+    } except ImportError {
+        return None;
+    }
 }
 
 """A finite number from an Excel cell, including localized strings; ValueError otherwise."""
@@ -288,6 +293,7 @@ def main {
         print(f"Error: File not found: {excel_path}", file=sys.stderr);
         sys.exit(1);
     }
+    openpyxl: any = _load_openpyxl();
     if openpyxl is None {
         print("Error: openpyxl is required. Install it with: neojac install", file=sys.stderr);
         sys.exit(1);
