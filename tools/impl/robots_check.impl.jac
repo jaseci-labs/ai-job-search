@@ -1,26 +1,6 @@
-impl _fetch(url, ua) -> any {
+impl _fetch(url: str, ua: str) -> tuple[str, int] {
     r: any = subprocess.run(
-        [
-            "curl",
-            "-sS",
-            "-L",
-            "--proto",
-            "=http,https",
-            "--proto-redir",
-            "=http,https",
-            "--max-redirs",
-            "5",
-            "--max-time",
-            "12",
-            "-A",
-            ua,
-            "-H",
-            "Accept: text/plain,*/*",
-            "-w",
-            "\n%{http_code}",
-            "--",
-            url,
-        ],
+        [*CURL, "-A", ua, "-H", "Accept: text/plain,*/*", "-w", "\n%{http_code}", "--", url],
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -28,88 +8,65 @@ impl _fetch(url, ua) -> any {
         timeout=20,
     );
     if r.returncode != 0 {
-        raise RuntimeError("curl exit %d" % r.returncode);
+        raise RuntimeError(f"curl exit {r.returncode}");
     }
-    body: any;
-    _: any;
-    code: any;
-    (body, _, code) = r.stdout.rpartition("\n") as any;
-    return (body, `int(code or 0));
+    (body, _, code) = r.stdout.rpartition("\n");
+    return (body, int(code or 0));
 }
 
-impl is_robots_body(text) -> any {
-    text = text.removeprefix("﻿");
-    lines: any = [raw.split("#", 1)[0].strip() for raw in text.splitlines()];
-    if not `any(lines) {
-        return True;
-    }
-    line: any;
-    for line in lines {
-        line = line.lower();
-        if ":" in line
-            and line.split(":", 1)[0].strip()
-                in ("user-agent", "allow", "disallow", "sitemap", "crawl-delay", "host")
-        {
-            return True;
-        }
-    }
-    return False;
+impl _lines(text: str) -> list[str] {
+    return [raw.split("#", 1)[0] for raw in text.removeprefix(BOM).splitlines()];
 }
 
-impl has_undecodable_rule(text) -> any {
-    for raw in text.removeprefix("﻿").splitlines() {
-        line: any = raw.split("#", 1)[0];
-        if "�" in line and ":" in line {
-            field: any = line.split(":", 1)[0].replace("�", "").strip().lower();
-            if field in ("user-agent", "allow", "disallow") {
-                return True;
-            }
-        }
-    }
-    return False;
+impl is_robots_body(text: str) -> bool {
+    lines: list[str] = [line.strip().lower() for line in _lines(text)];
+    return not any(lines)
+        or any([":" in line and line.split(":", 1)[0].strip() in BODY_FIELDS for line in lines]);
 }
 
-impl _groups(text) -> any {
-    out: any;
-    agents: any;
-    expect: any;
-    (out, agents, expect) = ({}, [], True);
-    for raw in text.removeprefix("﻿").splitlines() {
-        line: any = raw.split("#", 1)[0].strip();
-        if not line or ":" not in line {
+impl has_undecodable_rule(text: str) -> bool {
+    return any([
+        UNDECODABLE in line
+            and ":" in line
+            and line.split(":", 1)[0].replace(UNDECODABLE, "").strip().lower() in RULE_FIELDS
+        for line in _lines(text)
+    ]);
+}
+
+impl _groups(text: str) -> dict[str, list[tuple[bool, str]]] {
+    out: dict[str, list[tuple[bool, str]]] = {};
+    agents: list[str] = [];
+    in_agents: bool = True;
+    for line in _lines(text) {
+        if ":" not in line {
             continue;
         }
-        field: any;
-        _: any;
-        value: any;
-        (field, _, value) = line.partition(":") as any;
-        (field, value) = (field.strip().lower(), value.strip());
-        if field == "user-agent" {
-            if not expect {
-                (agents, expect) = ([], True);
+        (name, _, value) = line.partition(":");
+        (name, value) = (name.strip().lower(), value.strip());
+        if name == "user-agent" {
+            if not in_agents {
+                (agents, in_agents) = ([], True);
             }
             agents.append(value.lower());
             out.setdefault(value.lower(), []);
-        } elif field in ("allow", "disallow") and agents {
-            expect = False;
-            for a in agents {
-                out[a].append((operator.eq(field, "allow"), value));
+        } elif name in ("allow", "disallow") and agents {
+            in_agents = False;
+            for agent in agents {
+                out[agent].append((name == "allow", value));
             }
         }
     }
     return out;
 }
 
-impl _match(pattern, path) -> any {
+impl _match(pattern: str, path: str) -> int {
     if pattern == "" {
         return -1;
     }
     pattern = unquote(pattern);
-    end_anchor: any = pattern.endswith("$");
-    pat: any = re.sub("\\*{2,}", "*", pattern[:-1] if end_anchor else pattern);
-    reach: any = [True] + [False] * len(pat);
-    j: any;
-    c: any;
+    end_anchor: bool = pattern.endswith("$");
+    pat: str = re.sub("\\*{2,}", "*", pattern[:-1] if end_anchor else pattern);
+    reach: list[bool] = [True] + [False] * len(pat);
     for (j, c) in enumerate(pat, 1) {
         if c != "*" {
             break;
@@ -120,7 +77,7 @@ impl _match(pattern, path) -> any {
         return len(pattern);
     }
     for ch in path {
-        step: any = [False] * (len(pat) + 1);
+        step: list[bool] = [False] * (len(pat) + 1);
         for (j, c) in enumerate(pat, 1) {
             if c == "*" {
                 step[j] = step[j - 1] or reach[j];
@@ -136,22 +93,19 @@ impl _match(pattern, path) -> any {
     return len(pattern) if reach[-1] else -1;
 }
 
-impl allowed(text, agent, path) -> any {
-    g: any = _groups(text);
-    rules: any = g.get(agent.lower()) or g.get("*") or [];
-    best_len: any;
-    best_allow: any;
+impl allowed(text: str, agent: str, path: str) -> bool {
+    groups: dict[str, list[tuple[bool, str]]] = _groups(text);
     (best_len, best_allow) = (-1, True);
-    for (is_allow, pat) in rules {
-        n: any = _match(pat, path);
+    for (is_allow, pat) in groups.get(agent.lower()) or groups.get("*") or [] {
+        n: int = _match(pat, path);
         if n > best_len or n == best_len and n >= 0 and not is_allow {
             (best_len, best_allow) = (n, is_allow);
         }
     }
-    return True if best_len < 0 else best_allow;
+    return best_allow;
 }
 
-impl gate(url) -> any {
+impl gate(url: str) -> tuple[int, str] {
     parts: any = urlsplit(url);
     if parts.scheme not in ("http", "https") {
         return (
@@ -162,46 +116,39 @@ impl gate(url) -> any {
     if not parts.netloc {
         return (1, "UNCONFIRMED (no host in the URL) - do not retry, go to step 3");
     }
-    path: any = unquote(parts.path) or "/";
+    path: str = unquote(parts.path) or "/";
     if parts.query {
         path += "?" + unquote(parts.query);
     }
-    robots: any = f"{parts.scheme}://{parts.netloc}/robots.txt";
-    body: any;
-    last: any;
-    (body, last) = (None, "no attempt");
-    for ua in ("Claude-User", BROWSER) {
+    body: str | None = None;
+    last: str = "no attempt";
+    for ua in (AGENT, BROWSER) {
         try {
-            text: any;
-            code: any;
-            (text, code) = _fetch(robots, ua) as any;
+            (text, code) = _fetch(f"{parts.scheme}://{parts.netloc}/robots.txt", ua);
         } except Exception as e {
-            last = `type(e).__name__;
+            last = type(e).__name__;
             continue;
         }
         if code == 404 {
             return (0, "ALLOWED - no robots.txt published");
         }
-        if code == 200 {
-            if not is_robots_body(text) {
-                last = "HTTP 200 but the body is not a robots.txt";
-                continue;
-            }
-            if has_undecodable_rule(text) {
-                last = "HTTP 200 but a User-agent/Allow/Disallow line is not valid UTF-8";
-                continue;
-            }
+        if code != 200 {
+            last = f"HTTP {code}";
+        } elif not is_robots_body(text) {
+            last = "HTTP 200 but the body is not a robots.txt";
+        } elif has_undecodable_rule(text) {
+            last = "HTTP 200 but a User-agent/Allow/Disallow line is not valid UTF-8";
+        } else {
             body = text;
             break;
         }
-        last = "HTTP %d" % code;
     }
     if body is None {
-        return (1, "UNCONFIRMED (%s) - do not retry, go to step 3" % last);
+        return (1, f"UNCONFIRMED ({last}) - do not retry, go to step 3");
     }
-    for a in ("Claude-User", "*") {
-        if not allowed(body, a, path) {
-            return (1, f"DISALLOWED for {a} - do not retry, go to step 3");
+    for agent in (AGENT, "*") {
+        if not allowed(body, agent, path) {
+            return (1, f"DISALLOWED for {agent} - do not retry, go to step 3");
         }
     }
     return (0, "ALLOWED - robots.txt permits this path");
@@ -222,7 +169,7 @@ impl main -> int {
         print("usage: jobsearch robots_check <url>", file=sys.stderr);
         return 2;
     }
-    result: any = gate(sys.argv[1]);
-    print(result[1]);
-    return result[0];
+    (code, message) = gate(sys.argv[1]);
+    print(message);
+    return code;
 }
