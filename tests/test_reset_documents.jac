@@ -1,5 +1,3 @@
-"""Replay /reset's actual Bash commands against isolated document files."""
-
 import from jaclang.comptime { target as target_ }
 
 import errno;
@@ -39,7 +37,6 @@ with entry {
     ];
 }
 
-"""Probe only the filesystem capability needed by the scope controls."""
 def symlinks_available -> any;
 
 with entry {

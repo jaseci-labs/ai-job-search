@@ -1,5 +1,3 @@
-"""Guards for the /add-portal command spec."""
-
 import unittest;
 
 import from pathlib { Path }

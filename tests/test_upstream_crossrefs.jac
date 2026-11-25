@@ -1,5 +1,3 @@
-"""Companion commands must inspect the same selected upstream ref."""
-
 import re;
 
 import shlex;

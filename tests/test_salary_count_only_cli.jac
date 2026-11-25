@@ -1,5 +1,3 @@
-"""Count-only workbook categories do not imply a suppressed salary index."""
-
 import json;
 
 import shutil;

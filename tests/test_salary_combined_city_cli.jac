@@ -1,14 +1,3 @@
-"""A combined name-and-city workbook column must feed salary_lookup --city.
-
-The IDA demonstration workbook heads its company column "Firmanavn og by"
-and stores "Ørsted A/S,Fredericia" in that one cell (no space after the
-comma). convert_salary_excel used to copy the whole cell into company with
-city "". The documented
-lookup `neojac run jobsearch -- salary_lookup "Ørsted" --city "Fredericia"` then missed,
-even though the city was in the converted file - just not in the field
---city reads.
-"""
-
 import json;
 
 import shutil;

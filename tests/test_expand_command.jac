@@ -1,5 +1,3 @@
-"""Tests for the /expand command specification."""
-
 import re;
 
 import unittest;

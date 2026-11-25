@@ -14,15 +14,6 @@ class ParsePageCountTests(unittest.TestCase) {
     def test_rejects_output_without_page_count -> any;
 }
 
-"""`--contains` must see through what LaTeX does to plain source text.
-
-    Measured on the stock CV compiled with the documented `lualatex` command
-    (#385): the apostrophe in `Master's` reaches the text layer as U+2019 and
-    the `--` in `2016--2024` as U+2013, so a whitespace-only fold reports both
-    keywords missing from a CV that plainly contains them. Under pdflatex
-    without T1 font encoding, accents arrive decomposed (`e` + U+0300) instead
-    of precomposed (#384).
-    """
 class NormalizeTextTests(unittest.TestCase) {
     def test_folds_curly_apostrophe_to_ascii -> any;
 
@@ -39,18 +30,6 @@ class NormalizeTextTests(unittest.TestCase) {
     def test_fold_is_symmetric -> any;
 }
 
-"""The date-range rule reads the raw layer; `--contains` folds and cannot.
-
-    `05-cv-templates.md` documents a Workday import that dropped a role's end
-    date because `2016--2024` reaches the text layer as `2016<U+2013>2024`, and
-    asks Step 5d to confirm every entry's years are joined by an ASCII hyphen.
-    The fold that makes `--contains "2016-2024"` pass on that layer (#458) is
-    what makes `--contains` unable to detect it - so this check never folds.
-
-    The newline cases are yang2632's finding on the PR: `\\s*` between year and
-    dash also matched a line break, so a heading ending in an ASCII date joined
-    a dash that merely opened the next line.
-    """
 class FindNonAsciiDateRangesTests(unittest.TestCase) {
     def test_en_dash_between_years_is_reported_with_its_code_point -> any;
 
@@ -154,10 +133,6 @@ class RunToolTests(unittest.TestCase) {
     def test_reports_unreadable_pdf(mock_run) -> any;
 }
 
-"""`.claude/settings.json` pre-approves verify_pdf.jac with any arguments, so
-    `--dump-text` was a prompt-free write to any path on disk (it also created
-    missing parent directories). The CLI now writes only a .txt under the
-    repo's cv/ or cover_letters/, the place apply.md Step 5d documents."""
 class DumpTargetTests(unittest.TestCase) {
     def setUp -> any;
 

@@ -1,5 +1,3 @@
-"""Run the converter on workbooks with both tabular and chart-only sheets."""
-
 import json;
 
 import from pathlib { Path }

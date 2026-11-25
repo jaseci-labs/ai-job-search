@@ -1,5 +1,3 @@
-"""Documented scoring JSON -> apply CLI -> exact weighted score and verdict."""
-
 import json;
 
 import subprocess;

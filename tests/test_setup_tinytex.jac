@@ -1,14 +1,3 @@
-"""Run SETUP.md's TinyTeX PATH snippet under bash and zsh against a fake HOME.
-
-The snippet is pasted into the user's interactive shell, which is zsh on
-macOS. zsh aborts a command whose glob matches nothing, so a lookup that
-globs both install locations came back empty there, and the snippet then
-persisted `export PATH=":$PATH"` - the current directory first on PATH in
-every future shell. bash's failglob aborts on an unmatched glob the same
-way, so that variant keeps the regression guarded on runners without zsh.
-The installer download is stripped; everything after it runs as written.
-"""
-
 import operator;
 
 import os;

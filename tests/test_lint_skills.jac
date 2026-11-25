@@ -40,10 +40,6 @@ class SettingsShapeTests(LinterRepoFixture) {
     def test_non_list_allow_fails_cleanly -> any;
 }
 
-"""check_skill()/check_command() are the linter's main job and were
-    previously untested - only check_settings() had coverage, so deleting
-    e.g. the missing-allowed-tools error survived the whole suite (review
-    finding F23, 2026-08-19)."""
 class SkillAndCommandCheckTests(LinterRepoFixture) {
     def write_skill(frontmatter: builtins.str) -> any;
 

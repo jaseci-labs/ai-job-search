@@ -1,9 +1,3 @@
-"""Every local image referenced by README.md must exist in the repo.
-
-A broken header image on the repo landing page is a silent, high-visibility
-failure; this guard turns it into a red CI run instead.
-"""
-
 import re;
 
 import unittest;

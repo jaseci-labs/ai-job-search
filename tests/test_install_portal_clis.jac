@@ -1,11 +1,3 @@
-"""Tests for tools/install_portal_clis.jac - the one-command portal CLI install.
-
-No network and no real `bun install`: discovery and the safety gate run against
-a temporary skills tree, the runner is injected, and the end-to-end cases run
-the script with --dry-run from a temporary checkout with no portals and with
-one copied in.
-"""
-
 import builtins;
 
 import from jaclang.comptime { target }
@@ -47,7 +39,6 @@ class InstallPortalClis(unittest.TestCase) {
 
     def add_cli(name, manifest=None) -> any;
 
-    """A fork-added portal is found without editing any list."""
     def test_discovers_every_cli_on_the_ci_glob -> any;
 
     def test_lifecycle_script_is_skipped_not_run -> any;

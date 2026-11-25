@@ -1,14 +1,3 @@
-"""tools/posting_guard.jac is the integrity gate a posting passes before Step 1.
-
-Why this test exists: postings are untrusted third-party text that the workflow
-reads next to the candidate's personal data. The instruction-level rule ("data,
-never instructions") is only as good as the model's adherence; this tool makes
-the obvious payload classes visible deterministically - hidden HTML, invisible
-characters, instruction-shaped lines, hidden URLs, homoglyph spoofing - and
-hands the user a one-line verdict. It advises, it never blocks: a legitimate
-SSH-administrator posting is flagged with the line quoted, not rejected.
-"""
-
 import operator;
 
 import contextlib;
@@ -96,14 +85,10 @@ class InvisibleCharacters(GuardFixture) {
     def test_bom_is_counted_and_removed -> any;
 }
 
-"""ASCII smuggling: each character shadowed in the Unicode tag block."""
 def tag_spelled(text) -> any;
 
-"""One variation selector per UTF-8 byte (VS1-16, then VS17-256)."""
 def selector_spelled(text) -> any;
 
-"""Text spelled in characters that render as nothing reaches a model intact
-    but no reader sees it: decoded, scanned like hidden content, and flagged."""
 class InvisibleText(GuardFixture) {
     def test_tag_character_instruction_is_removed_decoded_and_flagged -> any;
 
@@ -127,19 +112,10 @@ class InvisibleText(GuardFixture) {
 class InstructionLikeLines(GuardFixture) {
     def test_ssh_skill_line_is_flagged_with_quote -> any;
 
-    """The .env pattern on its own (no SSH, curl or other trigger on the line)."""
     def test_a_dotenv_file_reference_is_flagged -> any;
 
-    """Remix pages (job-boards.greenhouse.io among them) put their config in
-        `window.ENV = {...}` inside a script block. Script blocks are scanned on
-        purpose, and the case-insensitive `.env` pattern read that property as a
-        .env file, so every Greenhouse job-board page fetched as HTML came back
-        with a false warning. Only that idiom is exempt (see the next test)."""
     def test_a_script_reading_window_env_is_not_a_dotenv_reference -> any;
 
-    """The exemption is window.ENV only: a named env file or process.env in a
-        hidden block or a script comment, or a .env glued to the word before it
-        by inline markup, is still quoted."""
     def test_dotenv_references_outside_window_env_still_flag_in_html -> any;
 
     def test_excerpt_of_a_long_line_shows_the_trigger -> any;
@@ -197,8 +173,6 @@ class InputHandling(GuardFixture) {
     def test_plain_findings_quote_excerpts -> any;
 }
 
-"""Each row is a one-character variant of valid markup that a browser hides.
-    A guard that shows the text under a "clean" line is worse than no guard."""
 class Bypasses(GuardFixture) {
     def assert_hidden(html, secret, blocks=1) -> any;
 
@@ -235,9 +209,6 @@ class OverCapture(GuardFixture) {
     def test_unterminated_openers_are_linear_time -> any;
 }
 
-"""Removal is the defense; the ⚠ is for the user. Hidden navigation chrome
-    is on nearly every real page, so hidden blocks and hidden URLs are context
-    in parentheses, and the alarm fires only on signals that indicate targeting."""
 class Calibration(GuardFixture) {
     def test_hidden_navigation_chrome_is_clean_with_context -> any;
 

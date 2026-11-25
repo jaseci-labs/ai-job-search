@@ -1,17 +1,15 @@
-impl declared_codec(raw: builtins.bytes) -> any {
+impl declared_codec(raw: bytes) -> str | None {
     if raw.startswith((b"\xff\xfe", b"\xfe\xff")) {
         return "utf-16";
     }
-    `match: any = META_CHARSET.search(raw[:PRESCAN_BYTES]);
-    if `match is None {
-        return None;
-    }
-    return LABEL_TO_CODEC.get(`match.group(1).decode("ascii").lower());
+    found: any = META_CHARSET.search(raw[:PRESCAN_BYTES]);
+    return LABEL_TO_CODEC.get(found.group(1).decode("ascii").lower()) if found else None;
 }
 
-impl decode_page(raw: builtins.bytes) -> builtins.str {
+impl decode_page(raw: bytes) -> str {
     try {
         return raw.decode("utf-8");
-    } except UnicodeDecodeError {}
-    return raw.decode(declared_codec(raw) or "utf-8", errors="replace");
+    } except UnicodeDecodeError {
+        return raw.decode(declared_codec(raw) or "utf-8", errors="replace");
+    }
 }

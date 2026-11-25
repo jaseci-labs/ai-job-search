@@ -1,5 +1,3 @@
-"""Preserve space-grouped numbers through the real workbook converter CLI."""
-
 import json;
 
 import from pathlib { Path }

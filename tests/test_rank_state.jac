@@ -1,16 +1,3 @@
-"""Tests for tools/rank_state.jac - /rank's state helper (#395).
-
-/rank used to pull the whole of seen_jobs.json through the model's context to
-select candidates, then emit it back to record scores. That cost the whole
-backlog per run no matter how few jobs were being scored, and it grew for the
-life of the workspace. These pin the behaviour the three subcommands took
-over: selection matches Step 1's existing rules, the sweep matches rule 6
-exactly (including its two defensive-parse edge cases), and the write-back
-matches Step 4's existing rules exactly - the location_verdict legacy
-migration, the deadline null-is-not-a-correction rule, and verbatim
-strengths/gaps persistence.
-"""
-
 import operator;
 
 import csv;
@@ -82,11 +69,8 @@ class Candidates(RankStateCase) {
 class Sweep(RankStateCase) {
     def test_retires_past_deadlines_and_flags_the_closing_ones -> any;
 
-    """The majority case. Inferring one from first_seen would retire jobs
-        on a date nobody set."""
     def test_entries_without_a_deadline_are_left_alone -> any;
 
-    """Portals have shipped "ASAP", DD.MM.YYYY and free text into this field."""
     def test_non_iso_deadlines_are_reported_not_compared -> any;
 
     def test_only_ranked_entries_are_swept_and_excluded_keys_are_skipped -> any;
@@ -121,9 +105,6 @@ class Apply(RankStateCase) {
 
     def test_expired_status_is_written_through -> any;
 
-    """Absence is not a correction: a fetch that degraded to a listing page
-        returns no deadline, and blanking the stored date would also put the
-        entry out of the sweep's reach forever."""
     def test_null_deadline_does_not_erase_a_stored_one -> any;
 
     def test_legacy_verdict_stored_under_location_is_migrated -> any;
@@ -148,21 +129,9 @@ class Apply(RankStateCase) {
 
     def test_score_boundaries_and_fractional_scores_remain_valid -> any;
 
-    """Re-running /rank never re-scores an already-ranked job unless --all
-        says so (Step 4), but if it does score one again, apply must produce
-        the same result deterministically rather than accumulating state."""
     def test_re_scoring_an_already_ranked_job_is_idempotent -> any;
 }
 
-"""#534: a posting that could not be fetched is not a closed posting.
-
-    Both used to become `expired`, which `candidates` never selects again, so a
-    403 or a timeout on ranking day removed an open job from the pipeline for
-    good. `unreachable` is retried on later runs and only gives up to `expired`
-    after 3 attempts with at least 48 hours between the first and the last, so a
-    scheduled run plus a manual one on the same day cannot burn every attempt on
-    one outage.
-    """
 class Unreachable(RankStateCase) {
     static has RETRY_FIELDS: any = ("fetch_attempts", "first_unreachable", "last_fetch_error");
 
@@ -174,8 +143,6 @@ class Unreachable(RankStateCase) {
 
     def test_unreachable_entries_are_selected_again_on_the_next_run -> any;
 
-    """A scheduled run and a manual one the same day, then one more short of
-        48 hours: the attempt count is reached, the time floor is not."""
     def test_three_failures_inside_48_hours_keep_retrying -> any;
 
     def test_gives_up_after_three_failures_48_hours_apart -> any;
@@ -184,10 +151,6 @@ class Unreachable(RankStateCase) {
 
     def test_a_confirmed_closed_posting_still_expires_at_once -> any;
 
-    """A posting that closed on 2026-09-20 and returns 403 on 2026-10-05 is
-        closed by its own deadline, not unreachable: it expires at once, as the
-        scored path would, rather than being retried and later listed under
-        "Gave up, check manually" as possibly live."""
     def test_a_failed_fetch_past_the_stored_deadline_still_expires -> any;
 
     def test_fetch_error_is_stored_as_bounded_plain_text -> any;
@@ -198,10 +161,6 @@ class Unreachable(RankStateCase) {
 
     def test_an_unknown_gate_verdict_is_an_error_not_a_shortlisted_job -> any;
 
-    """`candidates` and `sweep` read every entry, so either crashed on a non-object
-        one. `apply` only touches the keys its results name, so on master a result
-        naming the bad entry crashed and a result naming only a valid entry exited 0
-        and wrote it. `load_state` now refuses the file for all three, naming the key."""
     def test_non_object_entry_is_reported_not_a_traceback -> any;
 }
 

@@ -1,5 +1,3 @@
-"""A workbook's prose notes tab must not be read as a company table."""
-
 import json;
 
 import from pathlib { Path }

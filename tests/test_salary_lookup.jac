@@ -1,5 +1,3 @@
-"""Tests for salary_lookup.jac — format_entry, match_score, and search_company."""
-
 import io;
 
 import json;
@@ -110,7 +108,6 @@ class ValidateDataTests(unittest.TestCase) {
     def test_categories_must_be_object_when_provided -> any;
 }
 
-"""Category-shape and duplicate-name checks (reuses assert_invalid_data)."""
 class ValidateDataShapeTests(ValidateDataTests) {
     def test_malformed_category_value_rejected -> any;
 
@@ -121,7 +118,6 @@ class ValidateDataShapeTests(ValidateDataTests) {
     def test_valid_categories_have_no_issues -> any;
 }
 
-"""End-to-end checks for the --validate pre-flight flow."""
 class ValidateFlagTests(unittest.TestCase) {
     def _run_validate(payload) -> any;
 
@@ -132,16 +128,7 @@ class ValidateFlagTests(unittest.TestCase) {
     def test_validate_flag_exits_0_on_duplicates_only -> any;
 }
 
-"""The disagreement in full: --validate blesses a file with a null
-    metadata/categories, then the lookup path must render it, not crash.
-
-    Both payloads pass --validate on master; the second command then dies
-    (TypeError in the categories fallback, AttributeError on metadata.get).
-    """
 class NullShapeEndToEndTests(unittest.TestCase) {
-    """Run main() against `payload` with the given argv. Returns
-        (exit_code_or_None, stdout). main() returns normally on a successful
-        render, so a missing SystemExit is success, not an error."""
     def _run_main(payload, *argv_tail_) -> any;
 
     def test_null_categories_passes_validate_then_renders -> any;
@@ -205,7 +192,6 @@ class TestSearchCompanyScoreThreshold(unittest.TestCase) {
     def test_results_sorted_by_relevance_descending -> any;
 }
 
-"""Exercise user-created UTF-8 files through the documented CLI."""
 class TestSalaryFileEncoding(unittest.TestCase) {
     def setUp -> any;
 

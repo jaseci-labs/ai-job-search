@@ -1,8 +1,3 @@
-"""The weekly release workflow can't run offline, so pin its safety properties.
-
-The version itself comes from commitizen (`cz bump --get-next`, .cz.toml).
-"""
-
 import unittest;
 
 import from pathlib { Path }

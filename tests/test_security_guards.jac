@@ -28,19 +28,8 @@ with entry {
     REPO_ROOT = Path(__file__).resolve().parent.parent;
 }
 
-"""Run the guard script in ``root``.
-
-    ``repository`` pins GITHUB_REPOSITORY for the subprocess so results do not
-    depend on where the suite runs (CI on upstream sets it to the upstream slug).
-    """
 def run_guards(`root: Path, repository=None) -> subprocess.CompletedProcess;
 
-"""Builds a minimal repo tree the guards pass on, then breaks one thing per test.
-
-    The guard script resolves the repo root from its own location, so each test
-    copies it into a temp tree and runs it as a subprocess - the same way CI
-    invokes it - asserting on real exit codes and messages.
-    """
 class GuardRepoFixture(unittest.TestCase) {
     def setUp -> any;
 
@@ -71,10 +60,6 @@ class PermissionGuardTests(GuardRepoFixture) {
     def test_malformed_settings_shape_fails_cleanly -> any;
 }
 
-"""settings.json ships deny rules (block in every mode, bypass included) and
-    ask rules (always prompt, even over a skill's allowed-tools grant). Removing
-    one silently re-opens the hole it closed, so each is required, like the
-    personal-data gitignore rules."""
 class AskDenyRuleTests(GuardRepoFixture) {
     def test_missing_required_deny_rule_fails -> any;
 
@@ -87,9 +72,6 @@ class AskDenyRuleTests(GuardRepoFixture) {
     def test_malformed_ask_or_deny_shape_fails_cleanly -> any;
 }
 
-"""A skill's or command's allowed-tools pre-approves those tools for the turn
-    that invokes it, with no prompt, in untrusted folders too. settings.json is
-    allowlisted; this holds the frontmatter to the same bar."""
 class SkillGrantGuardTests(GuardRepoFixture) {
     def test_bare_bash_in_skill_fails -> any;
 
@@ -132,10 +114,6 @@ class SkillGrantGuardTests(GuardRepoFixture) {
     def test_inline_code_and_exclamation_marks_pass -> any;
 }
 
-"""A .claude/agents/*.md definition's `tools:` list is an allowlist at tool-name
-    granularity (verified empirically: a `Bash(echo *)` entry resolves to plain
-    Bash). A missing key means every tool. These agents read untrusted postings,
-    so none may edit or write."""
 class AgentGrantGuardTests(GuardRepoFixture) {
     def test_agent_without_tools_key_fails -> any;
 
@@ -162,12 +140,6 @@ class AgentGrantGuardTests(GuardRepoFixture) {
     def test_agent_hooks_and_mcp_servers_fail -> any;
 }
 
-"""A hook in .claude/settings.json runs with no prompt when its event fires.
-
-    The shape used here is the one the Shai-Hulud worm planted in its August 2026
-    wave (a SessionStart hook chaining to .claude/math_init.js), per
-    https://research.jfrog.com/post/shai-hulud-is-back-august/
-    """
 class HookGuardTests(GuardRepoFixture) {
     def write_settings_with_hooks(hooks) -> any;
 
@@ -196,12 +168,6 @@ class GitignoreGuardTests(GuardRepoFixture) {
     def test_generated_report_rules_are_required -> any;
 }
 
-"""Pin the match semantics of the shipped .gitignore, not just rule presence.
-
-    The guard checks that a rule exists; it never checks what the rule matches.
-    These cases run real `git check-ignore` over the shipped file, for paths the
-    framework actually writes.
-    """
 class GitignorePatternBehaviorTests(unittest.TestCase) {
     def setUp -> any;
 
@@ -216,10 +182,6 @@ class GitignoreNegationTests(GuardRepoFixture) {
     def test_allowlisted_negations_pass -> any;
 }
 
-"""GHSA-rv99-7xf2-8f4p: git keeps leading whitespace in a pattern and drops
-    only unescaped trailing whitespace. The guard stripped both ends, so a
-    required rule prefixed with a space passed the guard while git had stopped
-    ignoring the file."""
 class GitignoreWhitespaceTests(GuardRepoFixture) {
     def test_rule_with_leading_whitespace_fails -> any;
 
@@ -230,9 +192,6 @@ class GitignoreWhitespaceTests(GuardRepoFixture) {
     def test_negation_with_leading_whitespace_is_still_a_negation -> any;
 }
 
-"""GHSA-rv99-7xf2-8f4p: a .gitignore in a subdirectory takes precedence
-    over the root file, so a negation there re-includes personal data the
-    guard, which read only the root file, never saw."""
 class SubdirectoryGitignoreTests(GuardRepoFixture) {
     def test_subdirectory_gitignore_negation_fails -> any;
 
@@ -243,10 +202,6 @@ class SubdirectoryGitignoreTests(GuardRepoFixture) {
     def test_gitignore_inside_node_modules_or_git_is_not_read -> any;
 }
 
-"""GHSA-cqcv-crx7-x7q7: the guard checked allow, ask, deny and hooks and
-    nothing else, so a settings.json could add keys that run commands or turn
-    prompts off (env, apiKeyHelper, statusLine, permissions.defaultMode) and
-    still pass."""
 class SettingsKeyAllowlistTests(GuardRepoFixture) {
     def _settings_with(top=None, permissions=None) -> any;
 
@@ -257,7 +212,6 @@ class SettingsKeyAllowlistTests(GuardRepoFixture) {
     def test_shipped_keys_pass -> any;
 }
 
-"""`.github/security-guards-local.txt`: a fork-only extension of the negation allowlist."""
 class LocalNegationsTests(GuardRepoFixture) {
     static has FORK: any = "someone-else/ai-job-search";
 
@@ -303,7 +257,6 @@ class ManifestGuardTests(GuardRepoFixture) {
     def test_no_manifests_at_all_passes -> any;
 }
 
-"""A committed node_modules entry (symlink, file or directory) fails the guard."""
 class TrackedNodeModulesTests(GuardRepoFixture) {
     def _git(*args_) -> any;
 

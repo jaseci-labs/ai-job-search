@@ -1,5 +1,3 @@
-"""Non-finite workbook cells cannot crash conversion or escape as JSON numbers."""
-
 import json;
 
 import subprocess;

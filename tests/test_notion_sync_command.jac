@@ -1,12 +1,3 @@
-"""Guards for the /notion-sync command spec.
-
-The command is a markdown spec (the spec IS the implementation), so these
-tests pin the invariants that would break silently: the header format that
-lint_skills.jac enforces, the gitignore entry that keeps the personal sync
-state out of version control, and the privacy rule that forbids syncing
-document content to Notion.
-"""
-
 import subprocess;
 
 import sys;

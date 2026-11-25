@@ -1,14 +1,3 @@
-"""Every seen_jobs.json reference in the scrape/rank/notion-sync/upskill specs names the full path.
-
-Step 0 reads `job_scraper/seen_jobs.json`, but later steps (notably Step 4,
-where the file is written) used the bare filename. An agent following Step 4
-literally can create `seen_jobs.json` in the repo root. The ignore rules only
-cover `**/job_scraper/seen_jobs.json`, so a root-level copy is untracked-by-rule
-only by accident: it shows up in `git status`, gets swept into a commit, and
-publishes the user's scrape history. Pinning the full path in the spec keeps
-the read path, the write path and the ignore rule pointing at the same file.
-"""
-
 import re;
 
 import unittest;

@@ -26,9 +26,6 @@ with entry {
 
 def git(`root: Path, *args_: builtins.str) -> builtins.str;
 
-"""Builds a real git history: a shared base, then an `upstream/master`
-    ref that runs ahead, so the triage script can be exercised fully offline.
-    """
 class TriageRepoFixture(unittest.TestCase) {
     def setUp -> any;
 
@@ -85,9 +82,6 @@ class MissingUpstreamRefTests(TriageRepoFixture) {
     def test_missing_ref_degrades_gracefully -> any;
 }
 
-"""The workflow must no-op on the upstream template, so a template clone
-    never opens an issue by surprise. GitHub Actions can't run offline, so we
-    pin the guard by asserting the job's `if` condition excludes upstream."""
 class WorkflowGuardTests(unittest.TestCase) {
     def test_workflow_is_guarded_against_upstream -> any;
 

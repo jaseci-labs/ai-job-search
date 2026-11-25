@@ -1,5 +1,3 @@
-"""Workbook blank rows must not make the generated salary data invalid."""
-
 import json;
 
 import shutil;

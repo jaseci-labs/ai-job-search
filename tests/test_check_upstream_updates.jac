@@ -82,9 +82,6 @@ class FailedFetchTests(UpstreamCheckerRepoFixture) {
     def test_cached_ref_after_failed_fetch_is_not_reported_as_current -> any;
 }
 
-"""Simulates upstream renaming/deleting one framework file while the
-    fork still has its own copy: git show then fails, and the checker used
-    to swallow the error and report a clean '[OK]'."""
 class UpstreamRefMissingFileTests(UpstreamCheckerRepoFixture) {
     def setUp -> any;
 

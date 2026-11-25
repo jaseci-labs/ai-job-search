@@ -1,16 +1,3 @@
-"""The Python tools must write UTF-8 whatever the host's default encoding is.
-
-On Windows a piped stdout (which is how Claude Code runs every tool) defaults
-to the ANSI code page, cp1252 on most Western installs. A tool that prints a
-posting title, company, CV line or file name outside that code page then dies
-with UnicodeEncodeError before the workflow sees any output: `/rank` could not
-list a single Cyrillic, CJK, Devanagari, Polish or Turkish posting.
-
-Each case runs the real CLI in a child process with a legacy stdout forced via
-PYTHONIOENCODING, so the Linux CI job reproduces what Windows users hit. The
-child must exit cleanly and its bytes must decode as UTF-8.
-"""
-
 import http.server;
 
 import io;
@@ -56,7 +43,6 @@ with entry {
     POLISH = "Żabka Łódź";
 }
 
-"""Run a tool the way a Western-locale Windows host pipes it."""
 def run_legacy_stdout(argv, cwd=None, `root=None) -> any;
 
 class ToolsWriteUtf8(unittest.TestCase) {

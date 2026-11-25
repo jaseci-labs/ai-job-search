@@ -1,5 +1,3 @@
-"""The documented pre-flight must reject metadata that breaks table lookups."""
-
 import json;
 
 import shutil;

@@ -1,12 +1,3 @@
-"""CHANGELOG.md is frozen at 1.7.4; releases after it are documented in GitHub Releases.
-
-Every PR used to add an entry under `## [Unreleased]`, and PRs opened before the
-freeze still carry one. Most of those entries sit mid-section, so git merges
-them cleanly into the frozen 1.7.4 section - a heading check would not notice.
-Pinning the file's content does: any edit fails here and points the author at
-the PR title, which is what the release notes are generated from.
-"""
-
 import hashlib;
 
 import unittest;

@@ -1,13 +1,3 @@
-"""Pin the workflow settings zizmor checks, without needing zizmor or PyYAML.
-
-- Every `actions/checkout` sets `persist-credentials: false`. Otherwise the job
-  token stays in `.git/config` for every later step, including the CLI code a
-  pull request brings (`artipacked`).
-- A value a pull request controls never appears expanded inside a `run:`
-  script (`template-injection`): `matrix.tool`, which `cli-checks` discovers
-  from directory names, and the PR title, which `pr-title` checks.
-"""
-
 import builtins;
 
 import unittest;
@@ -26,7 +16,6 @@ with entry {
 
 def indent(line: builtins.str) -> builtins.int;
 
-"""Column of a step's keys: two past the dash on a `- key:` line."""
 def key_indent(line: builtins.str) -> builtins.int;
 
 class WorkflowHardeningTests(unittest.TestCase) {

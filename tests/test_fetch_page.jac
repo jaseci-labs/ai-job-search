@@ -1,13 +1,3 @@
-"""tools/fetch_page.jac is the browser-header retry from 09-web-research.md.
-
-Why this test exists: the retry used to be a documented `curl` invocation plus
-an inline `python3 -c` tag-stripper, which meant the workflow needed a
-`Bash(curl:*)` grant - and `curl` with a free tail is an upload channel. The
-script replaces both with one GET-only command whose argv is fixed, that
-enforces the robots.txt gate itself, and that refuses to write inside the
-repo. These tests pin each of those properties against a real local server.
-"""
-
 import builtins;
 
 import contextlib;
@@ -119,9 +109,6 @@ class Fetching(FetchPageFixture) {
     def test_fetch_succeeds_when_curl_lacks_compression -> any;
 }
 
-"""The grant is `Bash(neojac run jobsearch -- fetch_page:*)`, so what curl is handed
-    is the whole security property: GET only, no body, no upload, and the URL
-    can never be parsed as an option."""
 class CurlArgvShape(unittest.TestCase) {
     def test_curl_argv_is_get_only_and_terminates_options -> any;
 

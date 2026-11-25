@@ -1,5 +1,3 @@
-"""A salary category must not steal the workbook's company-name column."""
-
 import json;
 
 import subprocess;

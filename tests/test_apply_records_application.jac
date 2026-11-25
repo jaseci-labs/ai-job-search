@@ -1,17 +1,3 @@
-"""Guards for /apply's tracker recording step (Step 6b).
-
-The step is part of the /apply markdown spec (the spec IS the
-implementation), so these tests pin the invariants that would break
-silently. Assertions are scoped to the section they belong to, following
-the pattern in test_upskill_skill.py: a whole-file `assertIn` for a word
-as common as `drafted` passes on any unrelated mention and guards nothing.
-
-The CSV header is the one rule most easily lost: it must stay
-byte-identical to /outcome's, which is the entire reason for reusing it.
-How each reader treats `drafted` is pinned per reader below, because the
-right answer differs between them.
-"""
-
 import fnmatch;
 
 import re;
@@ -79,71 +65,30 @@ with entry {
     TRACKER_HEADER = "date,company,sector,role,role_type,channel,status,contact_person,fit_rating,notes,cv_file,cover_letter_file,source,deadline";
 }
 
-"""The body of one markdown section, up to the next heading of any depth."""
 def section(path, heading) -> any;
 
-"""/apply Step 6b writes the row that six other commands read."""
 class ApplyRecordsApplication(unittest.TestCase) {
     def setUp -> any;
 
     def test_step_writes_a_drafted_row_with_both_document_paths -> any;
 
-    """Byte-identical, or the two commands create incompatible CSVs.
-
-        The exact-equality loop below is load-bearing, not decoration. `assertIn`
-        on its own cannot see an *additive* drift: a 13-column header is a
-        substring of a 14-column one, so appending a column to `/apply` and
-        forgetting `/outcome` passed this test cleanly until the loop was added.
-
-        It is also what makes the constant-only assertions in this class mean
-        anything: they reason about TRACKER_HEADER, and this is the test that
-        anchors TRACKER_HEADER to what both spec files actually say.
-        """
     def test_tracker_header_matches_outcome -> any;
 
-    """/apply appends rows with one field per header column, so inserting
-        `deadline` anywhere but the end shifts every value in every existing
-        row by one position."""
     def test_tracker_header_ends_with_deadline -> any;
 
-    """The migration sentence and the create path must name the same column.
-
-        Derived, never copied - the same discipline `HtmlReportTrackerFieldTests`
-        already applies to its `CANONICAL_HEADER`. A hardcoded `,deadline` here
-        keeps passing after the column is renamed or a fifteenth is appended,
-        because the assertion no longer has any connection to the header it is
-        supposed to police. A tracker migrated by these commands and one they
-        create from scratch would then hold different schemas, which is the exact
-        divergence the shared-header rule exists to prevent.
-        """
     def test_migration_appends_the_headers_own_last_column -> any;
 
-    """The optional application-form offer asks the user a question.
-
-        Anything after it only runs if the user answers, so recording the
-        application there would reproduce the bug this step fixes.
-        """
     def test_step_runs_before_the_optional_offer_that_ends_the_turn -> any;
 
     def test_matched_row_is_never_moved_backwards -> any;
 
-    """/outcome reads the latest dated note as the last activity."""
     def test_redraft_marker_is_undated -> any;
 
     def test_seen_jobs_is_left_alone -> any;
 
-    """/scrape Step 5 routes into the skill, bypassing /apply entirely."""
     def test_skill_defers_to_apply_rather_than_restating -> any;
 }
 
-"""`drafted` is non-final, so readers that mean *submitted* must say so.
-
-    Each of these defines its set by exclusion from the final statuses, so
-    a new non-final value joins them all silently. The one exception is
-    /gmail-sync, which must keep searching for drafted rows: the user
-    submitting by hand and not running /outcome is the failure #269 is
-    about, and an employer reply is how it gets caught.
-    """
 class DraftedMeansDraftedToEveryReader(unittest.TestCase) {
     static has CASES: any = [
         (
@@ -235,7 +180,6 @@ class DraftedMeansDraftedToEveryReader(unittest.TestCase) {
     def test_lint_skills_passes -> any;
 }
 
-"""Step 6b must also write the posting text it is holding to the archive."""
 class ApplyArchivesThePosting(unittest.TestCase) {
     static has CASES: any = [
         (
@@ -315,13 +259,6 @@ class ApplyArchivesThePosting(unittest.TestCase) {
     def test_posting_is_archived_where_every_reader_looks -> any;
 }
 
-"""#319: the deadline is carried through the whole pipeline and never dropped.
-
-    The header migration must be header-line-only (inserting it mid-column
-    shifts every value of every existing row), and every path that rewrites
-    a tracker row (/outcome Step 4, /gmail-sync Step 7a) must preserve
-    fields it does not parse - the deadline is the first such field.
-    """
 class DeadlineSurvivesEveryWrite(unittest.TestCase) {
     static has CASES: any = [
         (
@@ -437,20 +374,6 @@ class DeadlineSurvivesEveryWrite(unittest.TestCase) {
     def test_deadline_survives_every_write -> any;
 }
 
-"""The `cv_file` fallback must select one role's documents, not one company's.
-
-    `/apply` names drafts `cv/main_<company>_<role><CV_EXT>`, so two roles
-    at one company differ only in the role half. When the tracker row's
-    `cv_file`/`cover_letter_file` columns are empty - a row written before
-    #291, added by hand, or by /outcome's own outside-the-workflow path -
-    both readers fall back to a glob. A company-prefix glob matches both
-    roles and the first hit wins silently: /outcome copies it to
-    `cv_draft.tex`, and its own "leave an existing archived file" rule then
-    makes the wrong answer permanent (#443).
-
-    The globs are extracted from the specs rather than restated here, so
-    these tests pin what the specs actually say.
-    """
 class FallbackGlobFindsOneRolesDocuments(unittest.TestCase) {
     static has COMPANY: any = "Acme";
 
@@ -485,38 +408,19 @@ class FallbackGlobFindsOneRolesDocuments(unittest.TestCase) {
 
     def test_both_readers_glob_the_full_stem -> any;
 
-    """The two fallback globs exactly as the spec writes them."""
     static def globs(path, heading) -> any;
 
-    """Substitute the spec's placeholders the way the reader would."""
     def resolve(`glob, role) -> any;
 
-    """Exactly what /apply Step 5 leaves in cv/ for two roles at one company."""
     def drafted_files(ext=".tex") -> any;
 
     def test_the_cv_glob_selects_the_row_s_own_role -> any;
 
-    """Run the copy using the archive names persisted in /outcome's spec.
-
-        /add-template permits .typ, and /apply records that actual source path
-        in the tracker. An archive suffix must not relabel Typst source as TeX.
-        """
     def test_archiving_keeps_each_submitted_sources_extension_and_bytes -> any;
 
-    """`/add-template` makes `.typ` a real output; a hardcoded `.tex` misses it."""
     def test_the_glob_finds_a_non_tex_template -> any;
 }
 
-"""`<company>_<role>` must derive a single path component.
-
-    `Novo Nordisk A/S` used to derive `novo_nordisk_a/s_<role>/`: every
-    command that *derives* the path agrees and keeps working, while the
-    two that *enumerate* `documents/applications/*/` (/setup Path A,
-    /html-report's glob) silently skip the nested archive. The character
-    rule lives in one place - documents/README.md's Subfolder naming
-    block - and the derivation sites cite it rather than restating it
-    (jakob1379/ai-job-search#22).
-    """
 class ArchiveNameIsOnePathComponent(unittest.TestCase) {
     static has CASES: any = [
         (
@@ -583,10 +487,6 @@ class ArchiveNameIsOnePathComponent(unittest.TestCase) {
 
     def test_the_rule_has_one_home_and_every_deriver_cites_it -> any;
 
-    """The Subfolder naming rule, executed exactly as documented:
-        lowercase, underscores for spaces, drop every character that is
-        not a letter/digit/underscore, collapse runs, trim the ends.
-        (\\w is Unicode in Python 3, so Danish letters survive.)"""
     static def derive(company, role) -> any;
 
     static has DERIVATIONS: any = [

@@ -1,5 +1,3 @@
-"""The converter must not write baselines rejected by salary_lookup --validate."""
-
 import json;
 
 import subprocess;

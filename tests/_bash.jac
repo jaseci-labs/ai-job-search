@@ -1,5 +1,3 @@
-"""Find a usable Bash for tests that replay the documented reset commands."""
-
 import operator;
 
 import os;

@@ -1,17 +1,3 @@
-"""Guard for /apply Step 5b's page-count check.
-
-The 2-page CV and 1-page cover letter limits are the hard rules of
-05-cv-templates.md and 06-cover-letter-templates.md, and two places defer
-their enforcement to `tools/verify_pdf.jac --pages`: `verify_layout.jac`'s
-docstring ("page count is verify_pdf.jac's job, and CI runs it") and Step 5b's
-own prose, which used to say "Step 5d already runs it". Step 5d's only
-invocation is `--dump-text`, and no other step passed `--pages` at all, so
-the one rule with a mechanical check had zero runnable implementations in
-the workflow. These tests pin that the invocations exist where the prose says
-they do, with the counts the guides require, and that no step defers the
-check to another step that does not run it.
-"""
-
 import re;
 
 import unittest;
@@ -30,10 +16,8 @@ with entry {
     VERIFY_LAYOUT = REPO / "tools" / "verify_layout.jac";
 }
 
-"""The body of one markdown section, up to the next heading of any depth."""
 def section(path, heading) -> any;
 
-"""(document path, page count) for every runnable verify_pdf --pages line."""
 def page_count_invocations(text) -> any;
 
 class ApplyRunsThePageCountCheck(unittest.TestCase) {

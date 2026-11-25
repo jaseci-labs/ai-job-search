@@ -1,15 +1,3 @@
-"""Guards for /outcome's stale sweep branch (Step 2c).
-
-Pins the invariants for batch-resolving quiet applications:
-- Step 0 documents `stale` / `sweep` and `stale <N>` / `sweep <N>`.
-- Step 1.3 offers stale sweep when open rows exceed 60 days quiet.
-- Step 2c defines the Stale Sweep Branch.
-- Drafted applications are strictly excluded (never submitted).
-- The default threshold is 60 days quiet.
-- User confirmation (all, select, skip) is strictly required before writing.
-- Status is resolved to canonical 'no_response' spelling.
-"""
-
 import re;
 
 import unittest;

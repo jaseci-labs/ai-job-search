@@ -1,10 +1,3 @@
-"""Tests for the /html-report command and its gitignore rule.
-
-Mirrors the pattern in test_security_guards.py: one class that verifies
-properties of the real repo, testing the things CI would catch if the
-command file or gitignore rule were wrong.
-"""
-
 import csv;
 
 import datetime;
@@ -53,21 +46,14 @@ with entry {
     GITIGNORE = REPO_ROOT / ".gitignore";
 }
 
-"""Structural checks on the command file itself."""
 class HtmlReportCommandFileTests(unittest.TestCase) {
     def test_command_file_exists -> any;
 
-    """lint_skills.jac rejects command files that don't start with '# /<name>'."""
     def test_command_file_starts_with_correct_header -> any;
 
     def test_command_file_is_non_empty -> any;
 }
 
-"""The dashboard is a consumer of every tracker column: the Step 1 field
-    enumeration and the Step 3 table columns must stay in phase with the
-    canonical 14-column header (apply.md /outcome.md Step 1.1), so a future
-    column addition cannot silently vanish from the dashboard the way
-    `deadline` did."""
 class HtmlReportTrackerFieldTests(unittest.TestCase) {
     static has CANONICAL_HEADER: any = re.search(
         "^\\s*(date,company,[a-z_,]+)$",
@@ -77,34 +63,17 @@ class HtmlReportTrackerFieldTests(unittest.TestCase) {
 
     def test_step1_parses_every_canonical_tracker_column -> any;
 
-    """Date · Deadline order is the whole point of the change: the dashboard
-        must surface the clock that drives `/rank`'s urgency next to the date.
-        A membership pair (both `Date` and `Deadline` present somewhere) cannot
-        tell a swapped order from the correct one, and the order is what the
-        table shows the reader."""
     def test_step3_table_columns_include_deadline_after_date -> any;
 }
 
-"""reports/ must be gitignored — it holds personal generated output."""
 class HtmlReportGitignoreTests(unittest.TestCase) {
-    """status is a current state, not a history: an application that
-        interviewed and was then rejected carries status `rejected` and would
-        never count as having reached Interview, so a finished search reads
-        as though nobody ever interviewed (review finding F10, 2026-08-19).
-        The stage checkboxes merged from outcome.md in Step 1.2 are the
-        history; the funnel must be told to use them."""
     def test_funnel_is_computed_from_stage_history_not_current_status -> any;
 
-    """offer_declined is the candidate turning an offer down (a success)
-        and withdrawn is candidate-initiated; counting either as a rejection
-        inflates the rejection rate on a self-assessment dashboard (review
-        finding F11, 2026-08-19)."""
     def test_rejection_rate_excludes_declined_offers_and_withdrawals -> any;
 
     def test_reports_folder_is_gitignored -> any;
 }
 
-"""tools/html_report.jac renders a fixture tracker safely and offline."""
 class HtmlReportScriptTests(unittest.TestCase) {
     static has HEADER: any = HtmlReportTrackerFieldTests.CANONICAL_HEADER;
 
@@ -114,27 +83,20 @@ class HtmlReportScriptTests(unittest.TestCase) {
 
     static has PAYLOAD: any = "x' onmouseover='alert(1)' \" onfocus=\"alert(2)\" <img src=x onerror=alert(3)>";
 
-    """Every status, a drafted row, the legacy `no response` spelling, an unknown status and a
-        13-field row. Counting withdrawn/offer_declined as rejections, drafted rows as sent, or
-        dropping the legacy spelling each changes this line."""
     def test_fixture_tracker_pins_every_figure -> any;
 
     def test_empty_cells_do_not_print_none_and_the_rate_reading_is_stated -> any;
 
     def test_values_are_escaped_and_page_is_offline -> any;
 
-    """settings.json pre-approves the script, so a non-HTML --out, or an out.html symlink to a
-        non-HTML file, must be refused and left untouched."""
     def test_out_must_be_an_html_file -> any;
 
     def test_out_expands_a_quoted_home_path -> any;
 
     def test_settings_and_guards_allow_the_script -> any;
 
-    """A second application at one company must not inherit the first one's interview."""
     def test_new_archive_without_outcome_is_not_matched_to_older_same_company_archive -> any;
 
-    """Run the script on a tracker written as raw bytes (None: no tracker at all)."""
     def run_raw(tracker_bytes) -> any;
 
     def csv_text(rows) -> any;
@@ -169,11 +131,8 @@ class HtmlReportScriptTests(unittest.TestCase) {
 
     def test_a_year_only_date_is_charted_and_waits -> any;
 
-    """Before #329 the rule was only lowercase + underscores, so hyphens and dots stayed."""
     def test_folders_named_under_the_older_rule_still_match -> any;
 
-    """An archive from before #329 next to the folder /outcome writes now: the later-sorted
-        folder must not drop the earlier one's ticks."""
     def test_folders_sharing_a_key_merge_their_stages -> any;
 
     def test_names_with_vowel_signs_match_a_folder_that_keeps_them -> any;
@@ -192,14 +151,12 @@ class HtmlReportScriptTests(unittest.TestCase) {
 
     def test_uppercase_scheme_links_and_blank_sector_falls_back -> any;
 
-    """The screen-reader table behind a chart, as {label: value}."""
     static def table(html, caption) -> any;
 
     def test_offer_declined_reached_offer_in_the_funnel_and_the_stopped_chart -> any;
 
     def test_stopped_chart_agrees_with_the_funnel_on_ticked_stages -> any;
 
-    """documents/README.md Subfolder naming: lowercase, spaces to underscores, drop the rest."""
     static def folder(company, role) -> any;
 
     def past_screen(rows, archives) -> any;
@@ -213,7 +170,6 @@ class HtmlReportScriptTests(unittest.TestCase) {
     def test_non_latin_names_match_their_own_folder -> any;
 }
 
-"""lint_skills.jac must pass after the command is added."""
 @unittest.skipUnless(
     _HAVE_YAML,
     "PyYAML not installed (the CI Python-test job omits it; the lint job runs lint_skills.jac directly)",

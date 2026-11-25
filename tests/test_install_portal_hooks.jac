@@ -1,10 +1,3 @@
-"""Real Bun install against an offline npm registry: dependency hooks stay off.
-
-The fixture has the same ordinary npm dependency shape as esbuild, whose
-postinstall Bun 1.2 runs by default. It writes only a local marker. No public
-registry, credentials or lifecycle-script runner is mocked.
-"""
-
 import base64;
 
 import hashlib;

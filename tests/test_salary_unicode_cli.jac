@@ -1,5 +1,3 @@
-"""Company identity survives the documented salary-data-file -> CLI path."""
-
 import json;
 
 import shutil;

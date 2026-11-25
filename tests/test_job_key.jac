@@ -1,13 +1,3 @@
-"""Tests for tools/job_key.jac - the canonical seen_jobs.json key function.
-
-/scrape's key rule was prose only, so runs slugified inconsistently and the
-state file accumulated two failures: keys carrying "/", "," and "&" that break
-the archive-folder path `/apply`/`/outcome` derive from company+role, and the
-same job stored twice under two different truncations of a long title. These
-pin the fix - a pure, deterministic function of company+title(+url) - and the
-audit that finds both failure classes in an existing file.
-"""
-
 import builtins;
 
 import json;
@@ -42,9 +32,6 @@ class MakeKey(unittest.TestCase) {
 
     def test_deterministic_across_calls -> any;
 
-    """The bug that produced two Deloitte entries for one posting: two
-        runs truncated the same long title at different points. A hash of the
-        full slug makes truncation deterministic instead of lossy."""
     def test_long_titles_never_collide_after_truncation -> any;
 
     def test_non_latin_title_falls_back_to_the_portal_job_id -> any;
@@ -58,15 +45,6 @@ class MakeKey(unittest.TestCase) {
     def test_distinct_urls_still_get_distinct_keys -> any;
 }
 
-"""A name that folds to a fragment is as lossy as one that folds to nothing.
-
-    #487 and #502 added the hash fallbacks for titles and companies that
-    slugify to '', but a mixed-script name keeps its Latin or digit fragment and
-    skipped them: "Программист 1С" and "Аналитик 1С" both became "1", "Сбер AI"
-    and "Яндекс AI" both became "ai", so two postings shared one key and
-    `/scrape` Step 4 dropped the second as already seen. "1С" titles and
-    "N категории" grade suffixes are everyday Russian listings on freehire.
-    """
 class MixedScriptNamesKeepTheirIdentity(unittest.TestCase) {
     def test_titles_sharing_a_digit_fragment_get_distinct_keys -> any;
 
@@ -126,8 +104,6 @@ class AuditCLI(unittest.TestCase) {
 
     def test_duplicate_url_exits_nonzero -> any;
 
-    """Harmless drift, not damage - the sweep-worthy rewrite is a decision
-        the maintainer makes, not something the audit enforces."""
     def test_legacy_shape_alone_does_not_fail_the_audit -> any;
 
     def run_audit_raw(document) -> subprocess.CompletedProcess;
@@ -139,7 +115,6 @@ class AuditCLI(unittest.TestCase) {
     def test_non_string_url_is_reported_not_a_traceback -> any;
 }
 
-"""`--audit --migrate` rewrites drifted keys in place, safely."""
 class MigrateCLI(unittest.TestCase) {
     static has OLD: any = "mrsk_sfarende";
 

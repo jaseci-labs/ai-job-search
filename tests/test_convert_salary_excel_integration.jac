@@ -1,5 +1,3 @@
-"""Exercise the documented Excel -> converter CLI -> salary JSON path."""
-
 import json;
 
 import subprocess;

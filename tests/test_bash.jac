@@ -1,5 +1,3 @@
-"""A Bash launcher on PATH is not necessarily a usable shell (Windows WSL)."""
-
 import from pathlib { Path }
 
 import subprocess;

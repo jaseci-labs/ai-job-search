@@ -1,5 +1,3 @@
-"""Actual HTTP responses through the CLI entry point and urllib backend."""
-
 import http.server;
 
 import contextlib;

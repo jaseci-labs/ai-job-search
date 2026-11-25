@@ -1,5 +1,3 @@
-"""The scrape helper filters before detail fetches and never rewrites old entries."""
-
 import argparse;
 
 import contextlib;

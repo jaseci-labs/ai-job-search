@@ -131,17 +131,6 @@ class ParseNumericCellLocaleTests(unittest.TestCase) {
     def test_european_multiple_thousands_groups -> any;
 }
 
-"""A count/index pair whose headers carry no category word is still a pair.
-
-    "Count" + "Index" (Danish "Antal" + "Lønindeks") both strip to an empty
-    category name, and the pairing loop used to require a non-empty name on
-    both sides, so the single-category layout the README describes as
-    "auto-pairs count/index columns" came out as two unrelated standalone
-    columns. salary_lookup then rendered the count row with "N/A*" for the
-    index - "too few employees to publish (privacy)" - about a company whose
-    headcount was right there in the file. The literal name is asserted (not
-    the module constant) so the cases run, and fail, against the old converter.
-    """
 class BareCountIndexPairingTests(unittest.TestCase) {
     static has DEFAULT_CATEGORY: any = "all_employees";
 
@@ -154,16 +143,6 @@ class BareCountIndexPairingTests(unittest.TestCase) {
     def test_lookup_renders_the_bare_pair_as_one_row_without_the_privacy_footnote_firing -> any;
 }
 
-"""A name header must win over a salary header that also carries the word.
-
-    The detection loop kept the LAST header matching a company pattern, so
-    "Company Name | City | Company Count | Company Index" made the index
-    column the company column and every row's company read "108.5". #571
-    added an exact-match preference, which only helps when a header is
-    exactly "Company"; the qualified name header stayed exposed. The Danish
-    case below is a constructed header in the same shape, not the IDA
-    workbook, whose pairs are headed "Antal" and "Indeks" and already convert.
-    """
 class QualifiedCompanyHeaderNextToQualifiedSalaryHeader(unittest.TestCase) {
     def test_company_name_wins_over_company_index -> any;
 

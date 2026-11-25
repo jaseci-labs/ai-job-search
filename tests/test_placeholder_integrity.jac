@@ -1,21 +1,3 @@
-"""Guards for CI's placeholder-integrity sentinels.
-
-The job exists to catch personal data committed to the upstream template.
-That only works when each sentinel sits IN the data /setup replaces: the
-CV's old sentinel was `[YOUR_NAME]`, whose only occurrences were a header
-comment and the hyperref pdftitle - /setup's documented edit ("replace
-placeholder personal data with their actual name, contact info") touches
-neither, so a fully personalized CV with a real name, address, phone and
-email passed the check (review finding F28, 2026-08-19; proven
-empirically). Same weakness for 01-candidate-profile.md's `<!-- SETUP`
-comment sentinel.
-
-These tests pin (a) that ci.yml checks data-located sentinels, (b) that
-the sentinels exist in the pristine files, and (c) that simulating the
-/setup edit destroys at least one checked sentinel per file - i.e. the
-guard actually fires on the failure it exists to catch.
-"""
-
 import builtins;
 
 import unittest;
@@ -43,10 +25,6 @@ with entry {
     PROFILE_SENTINEL = "[YOUR_EMAIL]";
 }
 
-"""Apply /setup Step 3.8's documented edit: replace placeholder personal
-    data with a real name and contact info. Header comments and hyperref
-    metadata are not personal data, so they are deliberately left alone -
-    that is exactly why a comment-located sentinel guards nothing."""
 def personalize_cv(text: builtins.str) -> builtins.str;
 
 @unittest.skipIf(

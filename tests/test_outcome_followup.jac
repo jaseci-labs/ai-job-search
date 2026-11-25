@@ -1,14 +1,3 @@
-"""Guards for /outcome's follow-up branch (Step 2b).
-
-The branch is part of the /outcome markdown spec (the spec IS the
-implementation), so these tests pin the invariants that would break
-silently: the draft-only rule (the branch must never send anything on the
-user's behalf), the no-new-claims rule that keeps follow-ups inside the
-framework's never-fabricate boundary, the two-follow-up cap that terminates
-into /outcome's own no_response flow, and the deliberate contrast with
-/gmail-sync's 30-day staleness flag.
-"""
-
 import subprocess;
 
 import sys;

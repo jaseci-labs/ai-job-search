@@ -1,5 +1,3 @@
-"""Wrapped workbook header cells must convert like their one-line spelling."""
-
 import json;
 
 import from pathlib { Path }
