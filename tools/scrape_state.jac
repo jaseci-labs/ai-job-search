@@ -5,9 +5,7 @@ pass the enriched entries to `store`. Both commands deduplicate against the
 current history and tracker; `store` writes the history atomically.
 """
 
-import argparse;
-import json;
-import sys;
+import argparse, json, sys;
 import from pathlib { Path }
 import from urllib.parse { urlsplit }
 

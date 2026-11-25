@@ -1,11 +1,4 @@
-import http.server;
-import io;
-import json;
-import os;
-import subprocess;
-import sys;
-import threading;
-import unittest;
+import http.server, io, json, os, subprocess, sys, threading, unittest;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 import from unittest { mock }

@@ -1,9 +1,4 @@
-import os;
-import re;
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import os, re, shutil, subprocess, tempfile, unittest;
 import from pathlib { Path }
 
 glob DARWIN: str = "Library/TinyTeX/bin/universal-darwin";

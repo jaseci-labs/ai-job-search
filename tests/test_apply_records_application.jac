@@ -1,8 +1,4 @@
-import fnmatch;
-import re;
-import shutil;
-import tempfile;
-import unittest;
+import fnmatch, re, shutil, tempfile, unittest;
 import from pathlib { Path }
 
 glob TRACKER_HEADER: str = "date,company,sector,role,role_type,channel,status,contact_person,fit_rating,notes,cv_file,cover_letter_file,source,deadline",

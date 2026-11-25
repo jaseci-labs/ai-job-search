@@ -25,19 +25,7 @@ Exit codes: 0 fetched; 1 refused by robots policy (go to escalation step 4);
 2 usage or transport error.
 """
 
-import argparse;
-import gzip;
-import hashlib;
-import html;
-import os;
-import re;
-import shutil;
-import string;
-import subprocess;
-import sys;
-import tempfile;
-import time;
-import zlib;
+import argparse, gzip, hashlib, html, os, re, shutil, string, subprocess, sys, tempfile, time, zlib;
 import from functools { lru_cache }
 import from pathlib { Path }
 import from urllib.error { HTTPError }

@@ -1,5 +1,4 @@
-import re;
-import unittest;
+import re, unittest;
 import from pathlib { Path }
 
 glob CLAUDE: Path = Path(__file__).resolve().parent.parent / ".claude",

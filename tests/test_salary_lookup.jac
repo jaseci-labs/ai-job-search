@@ -1,8 +1,4 @@
-import io;
-import json;
-import subprocess;
-import tempfile;
-import unittest;
+import io, json, subprocess, tempfile, unittest;
 import from contextlib { redirect_stderr }
 import from pathlib { Path }
 

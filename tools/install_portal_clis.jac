@@ -11,12 +11,7 @@ Exit 0 when every CLI installed, 1 when bun is missing, a manifest was skipped, 
 install failed.
 """
 
-import argparse;
-import json;
-import os;
-import shutil;
-import subprocess;
-import sys;
+import argparse, json, os, shutil, subprocess, sys;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

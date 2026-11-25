@@ -1,7 +1,4 @@
-import subprocess;
-import tempfile;
-import unicodedata;
-import unittest;
+import subprocess, tempfile, unicodedata, unittest;
 import from pathlib { Path }
 import from unittest.mock { patch }
 

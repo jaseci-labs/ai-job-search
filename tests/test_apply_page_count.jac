@@ -1,5 +1,4 @@
-import re;
-import unittest;
+import re, unittest;
 import from pathlib { Path }
 
 glob REPO: Path = Path(__file__).resolve().parent.parent,

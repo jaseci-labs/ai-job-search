@@ -15,12 +15,7 @@ input has no text to evaluate, 2 when --in cannot be read or --out points inside
 repository.
 """
 
-import argparse;
-import html;
-import json;
-import os;
-import re;
-import sys;
+import argparse, html, json, os, re, sys;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

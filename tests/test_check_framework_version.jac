@@ -1,8 +1,4 @@
-import os;
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import os, shutil, subprocess, tempfile, unittest;
 import from pathlib { Path, PureWindowsPath }
 import from unittest { mock }
 

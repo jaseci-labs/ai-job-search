@@ -1,5 +1,4 @@
-import re;
-import unittest;
+import re, unittest;
 import from typing { Callable }
 
 glob SKILLS: str = ".claude/skills/job-application-assistant/",

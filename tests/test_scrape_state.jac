@@ -1,9 +1,4 @@
-import argparse;
-import contextlib;
-import io;
-import json;
-import tempfile;
-import unittest;
+import argparse, contextlib, io, json, tempfile, unittest;
 import from pathlib { Path }
 
 glob DETAILS: dict[str, any] = {

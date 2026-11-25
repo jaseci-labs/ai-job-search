@@ -1,7 +1,4 @@
-import errno;
-import shutil;
-import subprocess;
-import unittest;
+import errno, shutil, subprocess, unittest;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 

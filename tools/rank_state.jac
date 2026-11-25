@@ -14,14 +14,7 @@ Every subcommand prints JSON on stdout. Exit 0 on success, 1 on a usage or state
 `apply` when any result could not be written.
 """
 
-import argparse;
-import csv;
-import json;
-import os;
-import re;
-import sys;
-import tempfile;
-import unicodedata;
+import argparse, csv, json, os, re, sys, tempfile, unicodedata;
 import from datetime { date, datetime, timedelta, timezone }
 import from fractions { Fraction }
 import from pathlib { Path }

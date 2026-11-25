@@ -1,8 +1,4 @@
-import json;
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import json, shutil, subprocess, tempfile, unittest;
 import from pathlib { Path }
 
 glob SETTINGS: str = ".claude/settings.json",

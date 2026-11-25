@@ -1,5 +1,4 @@
-import hashlib;
-import unittest;
+import hashlib, unittest;
 
 @unittest.skipIf(
     not is_upstream_checkout(), "the freeze guards the upstream changelog; forks may keep their own"

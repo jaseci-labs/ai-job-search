@@ -1,8 +1,4 @@
-import shutil;
-import subprocess;
-import sys;
-import time;
-import unittest;
+import shutil, subprocess, sys, time, unittest;
 import from unittest { mock }
 
 glob STAR: str = "User-agent: *\n",

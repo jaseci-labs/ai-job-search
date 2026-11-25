@@ -1,12 +1,4 @@
-import csv;
-import datetime;
-import io;
-import json;
-import os;
-import re;
-import subprocess;
-import unicodedata;
-import unittest;
+import csv, datetime, io, json, os, re, subprocess, unicodedata, unittest;
 import from importlib.util { find_spec }
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }

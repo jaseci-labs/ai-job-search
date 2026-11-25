@@ -1,5 +1,4 @@
-import os;
-import subprocess;
+import os, subprocess;
 import from pathlib { Path }
 
 glob UPSTREAM: str = "ai-job-search-dev/ai-job-search",

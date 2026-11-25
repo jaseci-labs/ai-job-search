@@ -1,13 +1,4 @@
-import contextlib;
-import gzip;
-import http.server;
-import io;
-import os;
-import shutil;
-import subprocess;
-import tempfile;
-import threading;
-import unittest;
+import contextlib, gzip, http.server, io, os, shutil, subprocess, tempfile, threading, unittest;
 import from pathlib { Path }
 import from unittest { mock }
 

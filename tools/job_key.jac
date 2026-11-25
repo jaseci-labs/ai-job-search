@@ -18,14 +18,7 @@ Exit 0 when a key is produced, or when an audit finds nothing. Exit 1 when an au
 violations.
 """
 
-import argparse;
-import hashlib;
-import json;
-import os;
-import re;
-import shutil;
-import sys;
-import unicodedata;
+import argparse, hashlib, json, os, re, shutil, sys, unicodedata;
 import from datetime { datetime }
 import from pathlib { Path }
 

@@ -16,12 +16,7 @@ Expected Excel format:
       same category are grouped into one category.
 """
 
-import argparse;
-import json;
-import math;
-import os;
-import re;
-import sys;
+import argparse, json, math, os, re, sys;
 import from pathlib { Path }
 
 glob openpyxl: any = None,

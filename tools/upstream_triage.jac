@@ -10,10 +10,7 @@ Usage: neojac run jobsearch -- upstream_triage [--remote upstream] [--branch mas
 Always exits 0; an unavailable upstream ref is a note on stderr.
 """
 
-import argparse;
-import shlex;
-import subprocess;
-import sys;
+import argparse, shlex, subprocess, sys;
 import from pathlib { Path }
 
 """Use UTF-8 for piped output even on legacy-console hosts."""

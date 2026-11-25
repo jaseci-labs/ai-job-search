@@ -1,6 +1,4 @@
-import re;
-import tempfile;
-import unittest;
+import re, tempfile, unittest;
 import from pathlib { Path }
 import from urllib.parse { urlparse }
 

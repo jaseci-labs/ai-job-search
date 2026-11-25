@@ -1,6 +1,4 @@
-import re;
-import shlex;
-import subprocess;
+import re, shlex, subprocess;
 
 glob REMOTE: str = "forks/template",
      BRANCHES: tuple[str, ...] = ("release/next", "release'next");

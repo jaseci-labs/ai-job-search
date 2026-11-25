@@ -1,9 +1,4 @@
-import io;
-import json;
-import shutil;
-import subprocess;
-import sys;
-import unittest;
+import io, json, shutil, subprocess, sys, unittest;
 import from contextlib { redirect_stdout }
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }

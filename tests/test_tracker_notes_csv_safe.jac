@@ -1,6 +1,4 @@
-import csv;
-import io;
-import unittest;
+import csv, io, unittest;
 
 glob HEADER: str = "date,company,sector,role,role_type,channel,status,contact_person,fit_rating,notes,cv_file,cover_letter_file,source,deadline",
      CV: str = "cv/main_acme_data_scientist.tex",

@@ -28,13 +28,7 @@ Exit codes: 0 clean, 1 layout problem, 2 bad invocation or no usable extractor.
 The shipped `cv/main_example.pdf` exits 1 by design: its placeholder page 2 is mostly empty.
 """
 
-import argparse;
-import functools;
-import os;
-import re;
-import shutil;
-import subprocess;
-import sys;
+import argparse, functools, os, re, shutil, subprocess, sys;
 import from pathlib { Path }
 
 glob GAP_LIMIT_PT: float = 100.0,

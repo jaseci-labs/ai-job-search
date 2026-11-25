@@ -1,14 +1,8 @@
 """Data layer for /html-report: tracker rows, status buckets, outcome.md stages, counts,
 funnel and rates, gathered by load() for tools/html_report.jac to render unchanged."""
 
-import collections;
-import csv;
-import datetime;
+import collections, csv, datetime, os, re, sys, unicodedata;
 import from glob { glob as list_paths }
-import os;
-import re;
-import sys;
-import unicodedata;
 
 glob BUCKET: dict[str, str] = {
          "drafted": "Drafted",

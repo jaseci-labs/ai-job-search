@@ -18,11 +18,7 @@ that needs to widen one of them must update the allowlists below in the same dif
 Stdlib only. Exit 0 on success, 1 with a failure list otherwise.
 """
 
-import json;
-import os;
-import re;
-import subprocess;
-import sys;
+import json, os, re, subprocess, sys;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

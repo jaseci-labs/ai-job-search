@@ -1,10 +1,4 @@
-import contextlib;
-import http.server;
-import io;
-import shutil;
-import threading;
-import unittest;
-import zlib;
+import contextlib, http.server, io, shutil, threading, unittest, zlib;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 import from unittest { mock }

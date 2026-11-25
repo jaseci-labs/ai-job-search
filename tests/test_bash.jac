@@ -1,5 +1,4 @@
-import subprocess;
-import unittest;
+import subprocess, unittest;
 import from pathlib { Path }
 import from unittest { mock }
 

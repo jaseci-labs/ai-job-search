@@ -1,6 +1,4 @@
-import runpy;
-import sys;
-import unittest;
+import runpy, sys, unittest;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(__file__).resolve().parent;

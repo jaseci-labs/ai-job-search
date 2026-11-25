@@ -1,10 +1,4 @@
-import contextlib;
-import io;
-import json;
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import contextlib, io, json, shutil, subprocess, tempfile, unittest;
 import from unittest { mock }
 import from pathlib { Path }
 

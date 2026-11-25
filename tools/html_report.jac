@@ -6,12 +6,7 @@ system fonts and no network requests.
 Usage: neojac run jobsearch -- html_report [--out reports/application-dashboard.html] [--root .]
 """
 
-import argparse;
-import contextlib;
-import datetime;
-import os;
-import sys;
-import tempfile;
+import argparse, contextlib, datetime, os, sys, tempfile;
 import from html { escape }
 
 glob BLANK: str = "<span class='muted' aria-label='empty'>—</span>",

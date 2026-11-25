@@ -15,9 +15,7 @@ Usage:  neojac run jobsearch -- robots_check <url>
 Exit 0 = the retry may proceed. Exit 1 = do not retry; go to escalation step 3.
 """
 
-import re;
-import subprocess;
-import sys;
+import re, subprocess, sys;
 import from urllib.parse { urlsplit, unquote }
 
 glob BROWSER: str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",

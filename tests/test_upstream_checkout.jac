@@ -1,6 +1,4 @@
-import os;
-import subprocess;
-import unittest;
+import os, subprocess, unittest;
 import from unittest { mock }
 
 glob UPSTREAM: str = "ai-job-search-dev/ai-job-search",

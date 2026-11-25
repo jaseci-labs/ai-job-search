@@ -1,6 +1,4 @@
-import os;
-import sys;
-import unittest;
+import os, sys, unittest;
 import from pathlib { Path }
 import from unittest { mock }
 

@@ -6,12 +6,7 @@ Fetches the upstream remote (default 'upstream', falling back to 'origin') and c
 the version stamps of the local framework files with those at the upstream ref.
 """
 
-import argparse;
-import os;
-import re;
-import shlex;
-import subprocess;
-import sys;
+import argparse, os, re, shlex, subprocess, sys;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

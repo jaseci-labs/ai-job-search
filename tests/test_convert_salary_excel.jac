@@ -1,5 +1,4 @@
-import io;
-import unittest;
+import io, unittest;
 import from contextlib { redirect_stderr }
 import from types { SimpleNamespace }
 

@@ -6,12 +6,7 @@ both sides; `--dump-text` writes the raw layer an ATS parser sees; `--ascii-date
 raw layer for a year joined to a Unicode dash, which ATS date parsers drop.
 """
 
-import argparse;
-import os;
-import re;
-import subprocess;
-import sys;
-import unicodedata;
+import argparse, os, re, subprocess, sys, unicodedata;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

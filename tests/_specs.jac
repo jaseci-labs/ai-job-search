@@ -1,9 +1,6 @@
 """Helpers for the tests that pin the wording of the docs and command specs."""
 
-import importlib.util;
-import re;
-import subprocess;
-import unittest;
+import importlib.util, re, subprocess, unittest;
 import from pathlib { Path }
 
 glob REPO: Path = Path(__file__).resolve().parent.parent,

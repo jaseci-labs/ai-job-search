@@ -1,7 +1,4 @@
-import json;
-import subprocess;
-import tempfile;
-import unittest;
+import json, subprocess, tempfile, unittest;
 import from pathlib { Path }
 
 glob TOOL: list[str] = tool("job_key"),

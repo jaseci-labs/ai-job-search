@@ -1,8 +1,4 @@
-import os;
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import os, shutil, subprocess, tempfile, unittest;
 import from pathlib { Path }
 
 glob REPO_ROOT: Path = Path(__file__).resolve().parent.parent,

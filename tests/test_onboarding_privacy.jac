@@ -1,5 +1,4 @@
-import re;
-import unittest;
+import re, unittest;
 
 class TestOnboardingPrivacy(unittest.TestCase) {
     def test_fork_sections_warn_next_to_the_fork_command {

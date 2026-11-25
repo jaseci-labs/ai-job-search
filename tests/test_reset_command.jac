@@ -1,6 +1,4 @@
-import re;
-import subprocess;
-import unittest;
+import re, subprocess, unittest;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 

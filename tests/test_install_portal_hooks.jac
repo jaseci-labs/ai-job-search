@@ -1,16 +1,7 @@
 import base64;
-import hashlib;
-import http.server;
-import io;
-import json;
-import os;
+import hashlib, http.server, io, json, os, shutil, subprocess, tarfile, threading, unittest;
 import from pathlib { Path }
-import shutil;
-import subprocess;
-import tarfile;
 import from tempfile { TemporaryDirectory }
-import threading;
-import unittest;
 
 glob BUN: str | None = os.environ.get("TEST_BUN") or shutil.which("bun");
 

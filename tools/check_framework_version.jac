@@ -4,10 +4,7 @@ and none is modified in git without that version being bumped.
 Framework files are the markdown files of .claude/skills/job-application-assistant/ and AGENTS.md.
 """
 
-import os;
-import re;
-import subprocess;
-import sys;
+import os, re, subprocess, sys;
 import from pathlib { Path }
 
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),

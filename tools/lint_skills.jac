@@ -13,10 +13,7 @@ Checks:
 Exit code 0 on success, 1 with a failure list otherwise.
 """
 
-import json;
-import os;
-import re;
-import sys;
+import json, os, re, sys;
 import from pathlib { Path }
 
 glob yaml: any;

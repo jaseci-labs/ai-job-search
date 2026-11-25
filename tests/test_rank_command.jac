@@ -1,6 +1,4 @@
-import json;
-import re;
-import unittest;
+import json, re, unittest;
 
 glob STEP_1: str = "Step 1: Load State",
      STEP_2: str = "Step 2: Batch-Fetch and Score",

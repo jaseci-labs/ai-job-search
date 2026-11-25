@@ -1,7 +1,4 @@
-import shutil;
-import subprocess;
-import tempfile;
-import unittest;
+import shutil, subprocess, tempfile, unittest;
 import from pathlib { Path }
 
 glob WORKFLOW: Path = Path(__file__).resolve().parent.parent

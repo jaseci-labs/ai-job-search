@@ -1,6 +1,4 @@
-import io;
-import subprocess;
-import unittest;
+import io, subprocess, unittest;
 import from contextlib { redirect_stdout }
 import from pathlib { Path }
 import from unittest.mock { patch }

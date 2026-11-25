@@ -10,13 +10,7 @@ Usage:
     neojac run jobsearch -- salary_lookup --validate
 """
 
-import argparse;
-import json;
-import math;
-import os;
-import re;
-import sys;
-import unicodedata;
+import argparse, json, math, os, re, sys, unicodedata;
 import from pathlib { Path }
 import from types { NoneType }
 

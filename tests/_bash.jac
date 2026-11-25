@@ -1,6 +1,4 @@
-import os;
-import shutil;
-import subprocess;
+import os, shutil, subprocess;
 import from pathlib { Path }
 
 glob WINDOWS: bool = os.name == "nt";
