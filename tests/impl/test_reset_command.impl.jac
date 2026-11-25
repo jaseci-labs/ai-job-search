@@ -1,343 +1,221 @@
-impl tracked_document_subfolders -> any {
-    out: any = subprocess.run(
+impl tracked_document_subfolders -> set[str] {
+    out: str = subprocess.run(
         ["git", "ls-files", "documents/"], cwd=REPO, capture_output=True, text=True, check=True
     ).stdout;
-    folders: any = set[any]();
-    for line in out.splitlines() {
-        parts: any = line.split("/");
-        if len(parts) >= 3 {
-            folders.add(parts[1]);
-        }
-    }
-    return folders;
+    return {line.split("/")[1] for line in out.splitlines() if line.count("/") >= 2};
 }
 
-impl TestResetCoversEveryDocumentsSubfolder.setUp -> any {
-    self.text = RESET.read_text(encoding="utf-8");
-    self.folders = tracked_document_subfolders();
-    self.assertGreaterEqual(len(self.folders), 5, self.folders);
-}
-
-impl TestResetCoversEveryDocumentsSubfolder.test_preview_lists_every_subfolder -> any {
-    missing: any = [f for f in sorted(self.folders) if f"documents/{f}/" not in self.text];
-    self.assertEqual(
-        missing,
-        [],
-        f"reset.md's preview never mentions these documents/ subfolders, so the user confirms a deletion list that omits them: {missing}",
-    );
-}
-
-impl TestResetCoversEveryDocumentsSubfolder.test_delete_block_removes_every_subfolder -> any {
-    section: any;
-    section = self.text.split("### Documents reset", 1)[1];
-    script: any = re.search("```bash\\n(.*?)```", section, re.S).group(1);
-    directory: any;
-    with TemporaryDirectory() as directory {
-        `root: any = Path(directory);
-        folder: any;
-        for folder in self.folders {
-            path: any = `root / "documents" / folder;
-            path.mkdir(parents=True);
-            (path / ".gitkeep").write_text("Keep scaffold.\n");
-            (path / "user.txt").write_text("Remove document.\n");
-        }
-        result: any = subprocess.run(
-            [BASH, "-c", script], cwd=`root, capture_output=True, text=True
-        );
-        self.assertEqual(result.returncode, 0, result.stderr);
-        for folder in self.folders {
-            path = `root / "documents" / folder;
-            self.assertEqual([`entry.name for `entry in path.iterdir()], [".gitkeep"]);
-            self.assertEqual((path / ".gitkeep").read_text(), "Keep scaffold.\n");
-        }
-    }
-}
-
-impl section(text: builtins.str, start: builtins.str, end: builtins.str) -> builtins.str {
-    begin: any = text.index(start);
-    return text[begin:text.index(end, begin)];
-}
-
-impl setup_step3_skill_files -> any {
-    step3: any = section(SETUP.read_text(encoding="utf-8"), "## Step 3:", "## Step 4:");
-    files: any = set[any]();
+impl setup_step3_skill_files -> set[str] {
+    step3: str = between(command("setup"), "## Step 3:", "## Step 4:");
+    files: set[str] = set();
     for target in re.findall("^###\\s+\\d+\\.\\s+\\w+\\s+`([^`]+)`", step3, re.MULTILINE) {
-        if (REPO / target).exists() {
-            if target.startswith(".claude/skills/") {
-                files.add(Path(target).name);
-            }
-            continue;
-        }
-        matches: any = `list((REPO / ".claude" / "skills").glob(f"*/{target}"));
-        if matches {
+        nested: bool = any((REPO / ".claude" / "skills").glob(f"*/{target}"));
+        if target.startswith(".claude/skills/") if (REPO / target).exists() else nested {
             files.add(Path(target).name);
         }
     }
     return files;
 }
 
-impl setup_path_a_inference_rules -> any {
-    a5: any = section(SETUP.read_text(encoding="utf-8"), "### Step A5:", "### Step A6:");
-    rules: any = [];
-    for line in a5.splitlines() {
-        `match: any = re.match("^- \\*\\*`([^`]+\\.md)`", line);
-        if `match {
-            rules.append((`match.group(1), re.findall("\"(## [^\"]+)\"", line)));
+impl setup_path_a_inference_rules -> list[tuple[str, list[str]]] {
+    a5: str = between(command("setup"), "### Step A5:", "### Step A6:");
+    return [
+        (found.group(1), re.findall("\"(## [^\"]+)\"", found.group(0)))
+        for found in re.finditer("^- \\*\\*`([^`]+\\.md)`.*$", a5, re.MULTILINE)
+    ];
+}
+
+impl skeleton_step(reset_text: str, filename: str) -> tuple[str, str] {
+    (instruction, _, rest) = reset_text[reset_text.index(f"**For `{filename}`**"):].partition(
+        "```markdown"
+    );
+    return (instruction, rest[:rest.index("```")]);
+}
+
+impl frontmatter(text: str) -> str {
+    return text[:text.index("\n---", 4) + 5] if text.startswith("---\n") else "";
+}
+
+impl appear_in_order(needles: list[str], haystack: list[str]) -> bool {
+    remaining: any = iter(haystack);
+    return all([needle in remaining for needle in needles]);
+}
+
+impl TestResetCoversEveryDocumentsSubfolder.setUp {
+    self.text = command("reset");
+    self.folders = tracked_document_subfolders();
+    self.assertGreaterEqual(len(self.folders), 5, self.folders);
+}
+
+impl TestResetCoversEveryDocumentsSubfolder.test_preview_lists_every_subfolder {
+    check(self, self.text, [f"documents/{folder}/" for folder in sorted(self.folders)]);
+}
+
+impl TestResetCoversEveryDocumentsSubfolder.test_delete_block_removes_every_subfolder {
+    with TemporaryDirectory() as directory {
+        paths: list[Path] = [Path(directory) / "documents" / folder for folder in self.folders];
+        for path in paths {
+            path.mkdir(parents=True);
+            (path / ".gitkeep").write_text("Keep scaffold.\n");
+            (path / "user.txt").write_text("Remove document.\n");
+        }
+        result = subprocess.run(
+            [BASH, "-c", bash_block(self.text, "### Documents reset")],
+            cwd=directory,
+            capture_output=True,
+            text=True,
+        );
+        self.assertEqual(result.returncode, 0, result.stderr);
+        for path in paths {
+            self.assertEqual([item.name for item in path.iterdir()], [".gitkeep"]);
+            self.assertEqual((path / ".gitkeep").read_text(), "Keep scaffold.\n");
         }
     }
-    return rules;
 }
 
-impl TestResetCoversPathAInferredContent.setUp -> any {
-    self.text = RESET.read_text(encoding="utf-8");
+impl TestResetCoversWhatSetupWrites.setUp {
+    self.text = command("reset");
     self.rules = setup_path_a_inference_rules();
-    self.files = {name for (name, _) in self.rules};
-    self.assertGreaterEqual(len(self.files), 6, self.rules);
-    self.assertIn("03-writing-style.md", self.files);
+    self.path_a = {name for (name, _) in self.rules};
+    self.step3 = setup_step3_skill_files();
 }
 
-impl TestResetCoversPathAInferredContent.test_step1_reads_every_path_a_file -> any {
-    inventory: any;
-    inventory = section(self.text, "Read the current state of these files", "Present as:");
-    missing: any = sorted(f for f in self.files if f not in inventory);
-    self.assertEqual(
-        missing,
-        [],
-        f"Step 1 never reads these Path A targets, so their preview line is unchecked: {missing}",
-    );
+impl TestResetCoversWhatSetupWrites.test_setup_targets_are_found {
+    self.assertGreaterEqual(len(self.path_a), 6, self.rules);
+    self.assertIn("03-writing-style.md", self.path_a);
+    self.assertGreaterEqual(len(self.step3), 6, self.step3);
+    self.assertLessEqual({"04-job-evaluation.md", "search-queries.md"}, self.step3);
 }
 
-impl TestResetCoversPathAInferredContent.test_preview_lists_every_path_a_file -> any {
-    listed: any;
-    preview: any = section(
-        self.text, "### If scope includes `profile`:", "### If scope includes `documents`:"
-    );
-    listed = section(
-        preview, "## Profile reset will clear:", "The following files are NOT touched"
-    );
-    missing: any = sorted(f for f in self.files if f not in listed);
-    self.assertEqual(
-        missing,
-        [],
-        f"Path A writes into these, but the preview never offers to clear them: {missing}",
-    );
-}
-
-impl TestResetCoversPathAInferredContent.test_preserved_list_claims_no_path_a_file_is_framework_only -> any {
-    preserved: any;
-    preserved = section(self.text, "The following files are NOT touched", "```");
-    mislabeled: any = sorted(f for f in self.files if f in preserved);
-    self.assertEqual(
-        mislabeled,
-        [],
-        f"listed as framework-only, but Path A writes candidate data into: {mislabeled}",
-    );
-}
-
-impl TestResetCoversPathAInferredContent.test_execution_removes_every_section_path_a_adds -> any {
-    blocks: any;
-    execution: any = section(self.text, "### Profile reset", "### Documents reset");
-    blocks = {};
-    for `match in re.finditer(
-        "^\\*\\*For `(?:[^`]*/)?([^`/]+)`\\*\\*(.*?)(?=^\\*\\*For `|\\Z)", execution, re.S | re.M
-    ) {
-        blocks[`match.group(1)] = blocks.get(`match.group(1), "") + `match.group(2);
+impl TestResetCoversWhatSetupWrites.test_every_setup_target_is_read_previewed_and_cleared {
+    preview: str = between(self.text, *PROFILE_PREVIEW);
+    preserved: str = between(self.text, *PRESERVED);
+    cases: list[tuple[str, set[str], str, bool]] = [
+        (
+            "Step 1 reads every Path A file",
+            self.path_a,
+            between(self.text, "Read the current state of these files", "Present as:"),
+            True,
+        ),
+        (
+            "the preview lists every Path A file",
+            self.path_a,
+            between(preview, "## Profile reset will clear:", PRESERVED[0]),
+            True,
+        ),
+        ("no Path A file is called framework-only", self.path_a, preserved, False),
+        ("the preview lists every Step 3 file", self.step3, preview, True),
+        (
+            "the execution clears every Step 3 file",
+            self.step3,
+            between(self.text, *EXECUTION),
+            True,
+        ),
+        ("no Step 3 file is called framework-only", self.step3, preserved, False),
+    ];
+    for (label, files, region, listed) in cases {
+        with self.subTest(label) {
+            self.assertEqual([name for name in sorted(files) if (name in region) != listed], []);
+        }
     }
-    missing: any = sorted(
+}
+
+impl TestResetCoversWhatSetupWrites.test_execution_removes_every_section_path_a_adds {
+    blocks: dict[str, str] = {};
+    for found in re.finditer(
+        "^\\*\\*For `(?:[^`]*/)?([^`/]+)`\\*\\*(.*?)(?=^\\*\\*For `|\\Z)",
+        between(self.text, *EXECUTION),
+        re.S | re.M,
+    ) {
+        blocks[found.group(1)] = blocks.get(found.group(1), "") + found.group(2);
+    }
+    missing: list[str] = [
         f"{name}: {heading}"
         for (name, headings) in self.rules
         for heading in headings
-        if heading not in blocks.get(name, ""),
-    );
-    self.assertEqual(
-        missing,
-        [],
-        f"Path A adds these sections, but no Step 3 instruction for that file removes them: {missing}",
-    );
+        if heading not in blocks.get(name, "")
+    ];
+    self.assertEqual(missing, [], "Path A adds these sections but /reset never removes them");
 }
 
-impl TestResetCoversEveryPersonalizedSkillFile.setUp -> any {
-    self.text = RESET.read_text(encoding="utf-8");
-    self.files = setup_step3_skill_files();
-    self.assertGreaterEqual(len(self.files), 6, self.files);
-    self.assertIn("04-job-evaluation.md", self.files);
-    self.assertIn("search-queries.md", self.files);
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.setUp {
+    self.reset = command("reset");
 }
 
-impl TestResetCoversEveryPersonalizedSkillFile.test_preview_lists_every_personalized_skill_file -> any {
-    preview: any;
-    preview = section(
-        self.text, "### If scope includes `profile`:", "### If scope includes `documents`:"
-    );
-    missing: any = sorted(f for f in self.files if f not in preview);
-    self.assertEqual(
-        missing,
-        [],
-        f"reset.md's profile preview never mentions these files that /setup Step 3 writes candidate data into, so the user types RESET against a list that omits them: {missing}",
-    );
-}
-
-impl TestResetCoversEveryPersonalizedSkillFile.test_execution_clears_every_personalized_skill_file -> any {
-    execution: any;
-    execution = section(self.text, "### Profile reset", "### Documents reset");
-    missing: any = sorted(f for f in self.files if f not in execution);
-    self.assertEqual(
-        missing,
-        [],
-        f"reset.md's Step 3 profile pass has no instruction for these files, yet the command then reports the skill files are \"now blank\": {missing}",
-    );
-}
-
-impl TestResetCoversEveryPersonalizedSkillFile.test_preserved_list_claims_no_personalized_file_is_framework_only -> any {
-    preserved: any;
-    preserved = section(self.text, "The following files are NOT touched", "```");
-    mislabeled: any = sorted(f for f in self.files if f in preserved);
-    self.assertEqual(
-        mislabeled,
-        [],
-        f"reset.md tells the user these files contain 'framework rules, not candidate data', but /setup Step 3 writes candidate data into them: {mislabeled}",
-    );
-}
-
-impl skeleton_step(reset_text, filename) -> any {
-    marker: any = f"**For `{filename}`**";
-    start: any = reset_text.index(marker);
-    fence_open: any = reset_text.index("```markdown", start);
-    fence_close: any = reset_text.index("```", fence_open + len("```markdown"));
-    return (reset_text[start:fence_open], reset_text[fence_open + len("```markdown"):fence_close]);
-}
-
-impl skeleton_block(reset_text, filename) -> any {
-    return skeleton_step(reset_text, filename)[1];
-}
-
-impl frontmatter(text) -> any {
-    if not text.startswith("---\n") {
-        return "";
-    }
-    end: any = text.index("\n---", 4);
-    return text[:end + len("\n---") + 1];
-}
-
-impl h2_headings(text) -> any {
-    return [line.strip() for line in text.splitlines() if line.startswith("## ")];
-}
-
-impl appear_in_order(needles, haystack) -> any {
-    remaining: any;
-    remaining = iter(haystack);
-    return all(needle in remaining for needle in needles);
-}
-
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.setUp -> any {
-    self.reset = RESET.read_text(encoding="utf-8");
-}
-
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_full_file_skeletons_keep_the_shipped_headings -> any {
-    for filename in ("01-candidate-profile.md", "02-behavioral-profile.md") {
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_full_file_skeletons_keep_the_shipped_headings {
+    for filename in FULL_FILES {
         with self.subTest(file=filename) {
-            shipped: any = (SKILL_DIR / filename).read_text(encoding="utf-8");
-            skeleton: any = h2_headings(skeleton_block(self.reset, filename));
-            if not is_upstream_checkout() {
-                self.assertTrue(
-                    appear_in_order(skeleton, h2_headings(shipped)),
-                    f"/reset's skeleton headings for {filename} must all appear, in order, in the personalized file: {skeleton}",
-                );
-                continue;
+            shipped: list[str] = h2(skill(filename));
+            skeleton: list[str] = h2(skeleton_step(self.reset, filename)[1]);
+            if is_upstream_checkout() {
+                self.assertEqual(skeleton, shipped);
+            } else {
+                self.assertTrue(appear_in_order(skeleton, shipped), skeleton);
             }
+        }
+    }
+}
+
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_fork_heading_check_rejects_a_renamed_dropped_or_reordered_heading {
+    cases: list[tuple[list[str], bool]] = [
+        (["Identity", "Education", "Certifications", "Awards"], True),
+        (["Identity", "Schooling", "Awards"], False),
+        (["Identity", "Awards"], False),
+        (["Education", "Identity", "Awards"], False),
+    ];
+    for (haystack, expected) in cases {
+        with self.subTest(haystack=haystack) {
             self.assertEqual(
-                skeleton,
-                h2_headings(shipped),
-                f"/reset's skeleton for {filename} must carry exactly the shipped ## headings, in order - a reset must not rename or drop sections",
+                appear_in_order(["Identity", "Education", "Awards"], haystack), expected
             );
         }
     }
 }
 
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_fork_heading_check_rejects_a_renamed_dropped_or_reordered_heading -> any {
-    skeleton: any = ["## Identity", "## Education", "## Awards"];
-    self.assertTrue(
-        appear_in_order(skeleton, ["## Identity", "## Education", "## Certifications", "## Awards"])
-    );
-    self.assertFalse(appear_in_order(skeleton, ["## Identity", "## Schooling", "## Awards"]));
-    self.assertFalse(appear_in_order(skeleton, ["## Identity", "## Awards"]));
-    self.assertFalse(appear_in_order(skeleton, ["## Education", "## Identity", "## Awards"]));
-}
-
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_full_file_skeletons_keep_the_framework_version_frontmatter -> any {
-    import sys;
-    import from tools.check_upstream_updates { get_framework_version_from_text }
-
-    for filename in ("01-candidate-profile.md", "02-behavioral-profile.md") {
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_full_file_skeletons_keep_the_framework_version_frontmatter {
+    for filename in FULL_FILES {
         with self.subTest(file=filename) {
-            shipped: any = (SKILL_DIR / filename).read_text(encoding="utf-8");
-            head: any = frontmatter(shipped);
+            shipped: str = skill(filename);
+            head: str = frontmatter(shipped);
             self.assertTrue(head, f"{filename} must ship with a frontmatter block");
-            instruction: any;
-            block: any;
-            (instruction, block) = skeleton_step(self.reset, filename) as any;
-            self.assertIn(
-                "frontmatter", instruction, f"the {filename} step must say to keep the frontmatter"
-            );
-            self.assertNotIn(
-                "framework_version", block, "the skeleton must not hardcode a version"
-            );
-            after: any = head + block.lstrip("\n");
+            (instruction, block) = skeleton_step(self.reset, filename);
+            self.assertIn("frontmatter", instruction);
+            self.assertNotIn("framework_version", block);
             self.assertEqual(
-                get_framework_version_from_text(after),
+                get_framework_version_from_text(head + block.lstrip("\n")),
                 get_framework_version_from_text(shipped),
-                f"a reset must leave {filename}'s framework_version readable and unchanged",
             );
         }
     }
 }
 
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_candidate_skeleton_keeps_the_languages_table_under_identity -> any {
-    shipped: any = (SKILL_DIR / "01-candidate-profile.md").read_text(encoding="utf-8");
-    start: any = shipped.index("### Languages");
-    header_rows: any = [
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_candidate_skeleton_keeps_the_languages_table_under_identity {
+    shipped: str = skill("01-candidate-profile.md");
+    header_rows: list[str] = [
         line
-        for line in shipped[start:].splitlines()[1:]
+        for line in shipped[shipped.index("### Languages"):].splitlines()[1:]
         if line.startswith("|")
     ][:2];
     self.assertEqual(
-        len(header_rows), 2, "the shipped Languages table must have a header and a separator row"
+        len(header_rows), 2, "the shipped Languages table needs a header and separator"
     );
-    block: any = skeleton_block(self.reset, "01-candidate-profile.md");
-    identity: any = block[block.index("## Identity"):block.index("## Education")];
-    self.assertIn(
-        "### Languages", identity, "the Languages table must sit under Identity, as shipped"
-    );
-    for row in header_rows {
-        with self.subTest(row=row) {
-            self.assertIn(row, identity);
-        }
-    }
+    block: str = skeleton_step(self.reset, "01-candidate-profile.md")[1];
+    check(self, between(block, "## Identity", "## Education"), ["### Languages", *header_rows]);
     self.assertNotIn("[LANGUAGE]", block, "a reset must not reintroduce a placeholder data row");
 }
 
-impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_partial_anchors_exist_in_the_files_they_target -> any {
-    cases: any = (
+impl TestResetTargetsTheHeadingsTheShippedFilesHave.test_partial_anchors_exist_in_the_files_they_target {
+    cases: list[tuple[str, str]] = [
         ("locate the section that begins with the line `([^`]+)`", "05-cv-templates.md"),
         ("The entire `([^`]+)` section", "07-interview-prep.md"),
-    );
+    ];
     for (pattern, filename) in cases {
         with self.subTest(file=filename) {
-            `match: any = re.search(pattern, self.reset);
-            self.assertIsNotNone(`match, f"reset.md no longer states its anchor for {filename}");
-            anchor: any = `match.group(1);
-            shipped: any = (SKILL_DIR / filename).read_text(encoding="utf-8");
-            self.assertIn(
-                anchor,
-                shipped,
-                f"/reset anchors {filename} on {anchor!r}, which the shipped file does not contain - the wipe would silently find nothing",
-            );
-            step: any = self.reset[`match.start():];
-            block_start: any = step.index("```markdown") + len("```markdown");
-            block: any = step[block_start:step.index("```", block_start)];
-            self.assertIn(
-                anchor, block, f"the replacement for {filename} must keep the heading {anchor!r}"
-            );
+            found = re.search(pattern, self.reset);
+            self.assertIsNotNone(found, f"reset.md no longer states its anchor for {filename}");
+            self.assertIn(found.group(1), skill(filename));
+            replacement: str = self.reset[found.start():].split("```markdown", 1)[1];
+            self.assertIn(found.group(1), replacement[:replacement.index("```")]);
         }
     }
 }

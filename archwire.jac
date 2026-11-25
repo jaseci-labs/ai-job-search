@@ -117,6 +117,30 @@ graph import {
     tests._tools ++> tests.test_security_guards { rooted, tool }
     tests._upstream ++> tests.test_security_guards { is_upstream_checkout }
     tests._upstream ++> tests.test_setup_command { is_upstream_checkout }
+    tests._docs ++> tests.test_add_portal_command { command, check }
+    tests._docs ++> tests.test_add_template_build_dir { command }
+    tests._docs ++> tests.test_gmail_sync_command { command }
+    tests._docs ++> tests.test_changelog_structure { REPO }
+    tests._docs ++> tests.test_readme_assets { REPO, doc }
+    tests._docs ++> tests.test_release_workflow { doc }
+    tests._docs ++> tests.test_expand_command { REPO, between, check, command, h2, quoted, skill }
+    tests._docs ++> tests.test_tracker_status_vocab { check, command, under }
+    tests._docs ++> tests.test_tracker_notes_csv_safe { command, under }
+    tests._docs ++> tests.test_placeholder_integrity { check, doc, skill }
+    tests._docs ++> tests.test_onboarding_privacy { check, command, doc, parts }
+    tests._docs ++> tests.test_latex_guidance { check, doc, under }
+    tests._docs ++> tests.test_setup_command { check, command, h2, parts, quoted, skill }
+    tests._docs ++> tests.test_setup_tinytex { bash_block, doc }
+    tests._docs ++> tests.test_reset_documents { bash_block, check, command }
+    tests._docs ++> tests.test_reset_command {
+        REPO,
+        bash_block,
+        between,
+        check,
+        command,
+        h2,
+        skill,
+    }
     tests._upstream as _upstream ++> tests.test_upstream_checkout;
     tests._upstream ++> tests.test_upstream_checkout { is_upstream_checkout }
     tools.verify_layout as verify_layout ++> tests.test_verify_layout;

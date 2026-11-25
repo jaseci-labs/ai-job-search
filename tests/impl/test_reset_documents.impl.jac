@@ -1,21 +1,16 @@
-impl symlinks_available -> any {
-    directory: any;
+impl symlinks_available -> bool {
     with TemporaryDirectory() as directory {
-        `root: any = Path(directory);
-        target: any = `root / "target";
+        target: Path = Path(directory) / "target";
         target.touch();
         try {
-            (`root / "link").symlink_to(target);
+            (Path(directory) / "link").symlink_to(target);
         } except NotImplementedError {
             return False;
         } except OSError as exc {
-            if exc.errno in (errno.ENOSYS, errno.ENOTSUP, errno.EPERM) {
+            if exc.errno in (errno.ENOSYS, errno.ENOTSUP, errno.EPERM)
+                or getattr(exc, "winerror", None) in (5, 1314)
+            {
                 return False;
-            }
-            comptime if target_().os == "windows" {
-                if getattr(exc, "winerror", None) in (5, 1314) {
-                    return False;
-                }
             }
             raise;
         }
@@ -23,164 +18,99 @@ impl symlinks_available -> any {
     }
 }
 
-impl ResetDocuments.reset_script -> any {
-    section: any = COMMAND.read_text(encoding="utf-8").split("### Documents reset", 1)[1];
-    return re.search("```bash\\n(.*?)```", section, re.S).group(1);
-}
-
-impl ResetDocuments.run_reset(populated) -> any {
-    for shell in SHELLS {
-        with self.subTest(shell=shell) {
-            self.run_reset_with(shell, populated);
-        }
+impl populate(base: Path, folders: list[str], files: list[str]) -> Path {
+    documents: Path = base / "documents";
+    for path in [documents / folder / name for folder in folders for name in files] {
+        path.parent.mkdir(parents=True, exist_ok=True);
+        path.write_text(f"{path.name}\n");
     }
-}
-
-impl ResetDocuments.run_reset_with(shell, populated) -> any {
-    directory: any;
-    with TemporaryDirectory() as directory {
-        `root: any = Path(directory);
-        documents: any = `root / "documents";
-        documents.mkdir();
-        readme: any = documents / "README.md";
-        readme.write_text("Keep these framework instructions.\n");
-        sibling: any = `root / "outside-documents.md";
-        sibling.write_text("Keep this external file.\n");
-        name: any;
-        for name in FOLDERS {
-            folder: any = documents / name;
-            folder.mkdir();
-            (folder / ".gitkeep").write_text("Keep this scaffold.\n");
-            if populated {
-                (folder / "summary.md").write_text("A document\n");
-                (folder / ".source.md").write_text("A hidden document\n");
-                nested: any = folder / "project-or-application";
-                nested.mkdir();
-                (nested / "README.md").write_text("A nested document\n");
-            }
-        }
-        result: any = subprocess.run(
-            [shell, "-c", self.reset_script()], cwd=`root, capture_output=True, text=True
-        );
-        self.assertEqual(result.returncode, 0, result.stderr);
-        self.assertEqual(result.stderr, "");
-        self.assertEqual(readme.read_text(), "Keep these framework instructions.\n");
-        self.assertEqual(sibling.read_text(), "Keep this external file.\n");
-        self.assertEqual({path.name for path in documents.iterdir()}, {*FOLDERS, "README.md"});
-        for name in FOLDERS {
-            self.assertEqual([path.name for path in (documents / name).iterdir()], [".gitkeep"]);
-            self.assertEqual((documents / name / ".gitkeep").read_text(), "Keep this scaffold.\n");
-        }
+    for path in (documents / "README.md", base / "outside" / "keep.md") {
+        path.parent.mkdir(parents=True, exist_ok=True);
+        path.write_text("Keep.\n");
     }
+    return documents;
 }
 
-impl ResetDocuments.test_all_document_entries_are_removed_without_removing_the_scaffold -> any {
-    self.run_reset(populated=True);
+impl reset(shell: str | None, base: Path) -> subprocess.CompletedProcess {
+    return subprocess.run(
+        [shell, "-c", bash_block(command("reset"), "### Documents reset")],
+        cwd=base,
+        capture_output=True,
+        text=True,
+    );
 }
 
-impl ResetDocuments.test_empty_document_folders_remain_usable -> any {
-    self.run_reset(populated=False);
-}
-
-impl ResetDocuments.test_a_missing_folder_is_skipped_and_the_rest_are_still_cleared -> any {
-    name: any;
+impl ResetDocuments.test_documents_are_removed_and_the_scaffold_is_kept {
+    full: list[str] = [".gitkeep", "summary.md", ".source.md", "project-or-application/README.md"];
+    cases: list[tuple[str, list[str], list[str]]] = [
+        ("populated", FOLDERS, full),
+        ("empty", FOLDERS, [".gitkeep"]),
+        ("missing folder", [name for name in FOLDERS if name != "diplomas"], full),
+    ];
     for shell in SHELLS {
-        with self.subTest(shell=shell) {
-            directory: any;
-            with TemporaryDirectory() as directory {
-                `root: any = Path(directory);
-                documents: any = `root / "documents";
-                documents.mkdir();
-                (documents / "README.md").write_text("Keep.\n");
-                present: any = [name for name in FOLDERS if name != "diplomas"];
-                for name in present {
-                    folder: any = documents / name;
-                    folder.mkdir();
-                    (folder / ".gitkeep").write_text("Keep.\n");
-                    (folder / "summary.md").write_text("A document\n");
-                }
-                result: any = subprocess.run(
-                    [shell, "-c", self.reset_script()], cwd=`root, capture_output=True, text=True
+        for (label, folders, files) in cases {
+            with self.subTest(shell=shell, tree=label), TemporaryDirectory() as directory {
+                documents: Path = populate(Path(directory), folders, files);
+                result = reset(shell, Path(directory));
+                self.assertEqual((result.returncode, result.stderr), (0, ""));
+                self.assertEqual(
+                    {path.name for path in documents.iterdir()}, {*folders, "README.md"}
                 );
-                self.assertEqual(result.returncode, 0, result.stderr);
-                self.assertEqual(result.stderr, "");
-                for name in present {
+                for kept in ("documents/README.md", "outside/keep.md") {
+                    self.assertEqual((Path(directory) / kept).read_text(), "Keep.\n");
+                }
+                for name in folders {
                     self.assertEqual(
                         [path.name for path in (documents / name).iterdir()], [".gitkeep"], name
                     );
+                    self.assertEqual((documents / name / ".gitkeep").read_text(), ".gitkeep\n");
                 }
-                self.assertFalse((documents / "diplomas").exists());
             }
         }
     }
 }
 
-impl ResetDocuments.test_block_uses_no_bash_only_builtins -> any {
-    script: any = self.reset_script();
-    for bashism in ("shopt", "declare ", "[[", "{cv,") {
-        self.assertNotIn(
-            bashism, script, f"the documents reset block must stay POSIX: found {bashism!r}"
-        );
-    }
+impl ResetDocuments.test_block_uses_no_bash_only_builtins {
+    check(
+        self,
+        bash_block(command("reset"), "### Documents reset"),
+        [],
+        ["shopt", "declare ", "[[", "{cv,"],
+    );
 }
 
-impl ResetDocuments.test_symlinked_roots_stop_before_any_deletion -> any {
-    name: any;
-    path: any;
-    for linked_root in ("documents", *(f"documents/{name}" for name in FOLDERS)) {
-        directory: any;
-        with self.subTest(linked_root=linked_root), TemporaryDirectory() as directory {
-            `root: any = Path(directory);
-            outside: any = `root / "outside";
-            outside.mkdir();
-            sentinel: any = outside / "keep.md";
-            sentinel.write_text("External document.\n");
-            documents: any = `root / "documents";
-            documents.mkdir();
-            for name in FOLDERS {
-                folder: any = documents / name;
-                folder.mkdir();
-                (folder / "local.md").write_text("Local document.\n");
-            }
-            target: any = `root / linked_root;
-            shutil.rmtree(target);
-            target.symlink_to(outside, target_is_directory=True);
-            locals_before: any = [
+impl ResetDocuments.test_symlinked_roots_stop_before_any_deletion {
+    for linked in ["documents", *[f"documents/{name}" for name in FOLDERS]] {
+        with self.subTest(linked_root=linked), TemporaryDirectory() as directory {
+            base: Path = Path(directory);
+            documents: Path = populate(base, FOLDERS, ["local.md"]);
+            shutil.rmtree(base / linked);
+            (base / linked).symlink_to(base / "outside", target_is_directory=True);
+            survivors: list[Path] = [
                 path
                 for name in FOLDERS
                 for path in (documents / name).glob("local.md")
             ];
-            result: any = subprocess.run(
-                [BASH, "-c", self.reset_script()], cwd=`root, capture_output=True, text=True
-            );
+            result = reset(BASH, base);
             self.assertNotEqual(result.returncode, 0);
             self.assertIn("symbolic link", result.stderr);
-            self.assertEqual(sentinel.read_text(), "External document.\n");
-            for path in locals_before {
-                self.assertEqual(path.read_text(), "Local document.\n");
+            self.assertEqual((base / "outside/keep.md").read_text(), "Keep.\n");
+            for path in survivors {
+                self.assertEqual(path.read_text(), "local.md\n");
             }
         }
     }
 }
 
-impl ResetDocuments.test_internal_symlink_is_removed_without_following_its_target -> any {
-    directory: any;
+impl ResetDocuments.test_internal_symlink_is_removed_without_following_its_target {
     with TemporaryDirectory() as directory {
-        `root: any = Path(directory);
-        outside: any = `root / "outside";
-        outside.mkdir();
-        sentinel: any = outside / "keep.md";
-        sentinel.write_text("External document.\n");
-        for name in FOLDERS {
-            (`root / "documents" / name).mkdir(parents=True);
-        }
-        link: any = `root / "documents/projects/external";
-        link.symlink_to(outside, target_is_directory=True);
-        result: any = subprocess.run(
-            [BASH, "-c", self.reset_script()], cwd=`root, capture_output=True, text=True
-        );
+        base: Path = Path(directory);
+        populate(base, FOLDERS, [".gitkeep"]);
+        link: Path = base / "documents/projects/external";
+        link.symlink_to(base / "outside", target_is_directory=True);
+        result = reset(BASH, base);
         self.assertEqual(result.returncode, 0, result.stderr);
         self.assertFalse(link.is_symlink());
-        self.assertEqual(sentinel.read_text(), "External document.\n");
+        self.assertEqual((base / "outside/keep.md").read_text(), "Keep.\n");
     }
 }
