@@ -130,6 +130,8 @@ graph import {
         text_start,
     }
     tools.fetch_page as fetch_page ++> tests.test_fetch_page;
+    tools.robots_check as robots_check ++> tests.test_fetch_page;
+    tests._tools ++> tests.test_fetch_page { REPO }
     tools.install_portal_clis ++> tests.test_install_portal_clis { discover, unsafe_reason }
     tools.install_portal_clis as install_portal_clis ++> tests.test_install_portal_clis;
     tests._tools ++> tests.test_install_portal_clis { rooted, tool }
