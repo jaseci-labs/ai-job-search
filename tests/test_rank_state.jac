@@ -52,12 +52,7 @@ class RankStateCase(unittest.TestCase) {
     }
 
     def start(*args: str) -> any {
-        return subprocess.run(
-            [*TOOL, *args, "--state", str(self.state)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        );
+        return capture([*TOOL, *args, "--state", str(self.state)], encoding="utf-8");
     }
 
     def run_tool(

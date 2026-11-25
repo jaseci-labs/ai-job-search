@@ -142,10 +142,8 @@ class MakeKey(unittest.TestCase) {
 
 class CompanyFallbackCLI(unittest.TestCase) {
     def key_for(company: str, url: str = "https://example.com/jobs/123456") -> str {
-        return subprocess.run(
+        return capture(
             [*TOOL, "--company", company, "--title", "Software Engineer", "--url", url],
-            capture_output=True,
-            text=True,
             encoding="utf-8",
             check=True,
         ).stdout.strip();
@@ -212,12 +210,7 @@ class StateFile(unittest.TestCase) {
     }
 
     def audit(*flags: str) -> subprocess.CompletedProcess {
-        return subprocess.run(
-            [*TOOL, "--audit", str(self.path), *flags],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        );
+        return capture([*TOOL, "--audit", str(self.path), *flags], encoding="utf-8");
     }
 
     def migrate -> dict[str, any] {
@@ -380,9 +373,7 @@ class MigrateCLI(StateFile) {
     }
 
     def test_migrate_without_audit_is_a_usage_error {
-        proc: subprocess.CompletedProcess = subprocess.run(
-            [*TOOL, "--migrate"], capture_output=True, text=True, encoding="utf-8"
-        );
+        proc: subprocess.CompletedProcess = capture([*TOOL, "--migrate"], encoding="utf-8");
         self.assertEqual(proc.returncode, 2);
     }
 }

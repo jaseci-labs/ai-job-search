@@ -57,7 +57,7 @@ class SalaryWorkbookCLI(unittest.TestCase) {
         } finally {
             book.close();
         }
-        return subprocess.run(
+        return capture(
             [
                 *tool("convert_salary_excel"),
                 str(self.workbook),
@@ -66,8 +66,6 @@ class SalaryWorkbookCLI(unittest.TestCase) {
                 *args,
             ],
             cwd=self.home,
-            capture_output=True,
-            text=True,
             encoding="utf-8",
         );
     }
@@ -88,13 +86,7 @@ class SalaryWorkbookCLI(unittest.TestCase) {
     }
 
     def lookup(*args: str) -> subprocess.CompletedProcess {
-        return subprocess.run(
-            [*tool("salary_lookup"), *args],
-            cwd=self.home,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-        );
+        return capture([*tool("salary_lookup"), *args], cwd=self.home, encoding="utf-8");
     }
 
     def test_cells_and_headers_convert_to_categories {

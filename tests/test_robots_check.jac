@@ -225,14 +225,10 @@ class Gate(RobotsCase) {
 class Curl(RobotsCase) {
     def test_cli_usage_and_dash_leading_argument {
         self.assertTrue((REPO / "tools" / "robots_check.jac").is_file());
-        usage: any = subprocess.run(
-            tool("robots_check"), capture_output=True, text=True, timeout=30
-        );
+        usage: any = capture(tool("robots_check"), timeout=30);
         self.assertEqual(usage.returncode, 2, usage.stderr);
         self.assertIn("usage:", usage.stderr);
-        dashed: any = subprocess.run(
-            [*tool("robots_check"), "--help"], capture_output=True, text=True, timeout=60
-        );
+        dashed: any = capture([*tool("robots_check"), "--help"], timeout=60);
         self.assertEqual(dashed.returncode, 1);
         self.assertNotIn("Usage: curl", dashed.stdout);
     }

@@ -27,9 +27,7 @@ class TriageRepoFixture(unittest.TestCase) {
     }
 
     def git(*args: str) -> str {
-        return subprocess.run(
-            ["git", *args], cwd=self.root, check=True, capture_output=True, text=True
-        ).stdout;
+        return capture(["git", *args], cwd=self.root, check=True).stdout;
     }
 
     def commit(msg: str, files: dict[str, str] = {}) -> str {
@@ -48,9 +46,7 @@ class TriageRepoFixture(unittest.TestCase) {
     }
 
     def triage(shows: list[str] = [], lacks: list[str] = []) -> str {
-        result = subprocess.run(
-            tool("upstream_triage"), cwd=self.root, capture_output=True, text=True
-        );
+        result = capture(tool("upstream_triage"), cwd=self.root);
         self.assertEqual(result.returncode, 0, result.stderr);
         for needle in shows {
             self.assertIn(needle, result.stdout);

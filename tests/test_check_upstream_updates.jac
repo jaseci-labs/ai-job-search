@@ -60,12 +60,10 @@ class UpstreamCheckerRepoFixture(unittest.TestCase) {
     def run_checker(
         *args: str, fetch: bool = False, env: dict[str, str] | None = None
     ) -> subprocess.CompletedProcess {
-        return subprocess.run(
+        return capture(
             [*tool("check_upstream_updates"), *([] if fetch else ["--no-fetch"]), *args],
             cwd=self.root,
             env=env,
-            capture_output=True,
-            text=True,
             encoding="utf-8",
         );
     }

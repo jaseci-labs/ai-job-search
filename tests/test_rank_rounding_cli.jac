@@ -48,7 +48,7 @@ class ExactRankRoundingCLI(unittest.TestCase) {
                 ]),
                 encoding="utf-8",
             );
-            proc: any = subprocess.run(
+            proc: any = capture(
                 [
                     *TOOL,
                     "apply",
@@ -59,8 +59,6 @@ class ExactRankRoundingCLI(unittest.TestCase) {
                     "--today",
                     "2026-10-16",
                 ],
-                capture_output=True,
-                text=True,
                 encoding="utf-8",
             );
             self.assertEqual(proc.returncode, 0, proc.stderr);

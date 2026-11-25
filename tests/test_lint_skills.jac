@@ -44,9 +44,7 @@ class LintSkillsTests(unittest.TestCase) {
             (self.root / rel).parent.mkdir(parents=True, exist_ok=True);
             (self.root / rel).write_text(text, encoding="utf-8");
         }
-        result: subprocess.CompletedProcess = subprocess.run(
-            tool("lint_skills"), capture_output=True, text=True
-        );
+        result: subprocess.CompletedProcess = capture(tool("lint_skills"));
         self.assertNotIn("Traceback", result.stderr);
         return result;
     }

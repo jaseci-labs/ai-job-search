@@ -248,13 +248,8 @@ class LookupCLI(unittest.TestCase) {
     }
 
     def run_cli(*args: str) -> subprocess.CompletedProcess {
-        return subprocess.run(
-            [*tool("salary_lookup"), *args],
-            cwd=self.home,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=30,
+        return capture(
+            [*tool("salary_lookup"), *args], cwd=self.home, encoding="utf-8", timeout=30
         );
     }
 

@@ -12,9 +12,7 @@ glob BASH: str | None = find_bash(),
      EXECUTION: tuple[str, str] = ("### Profile reset", "### Documents reset");
 
 def tracked_document_subfolders -> set[str] {
-    out: str = subprocess.run(
-        ["git", "ls-files", "documents/"], cwd=REPO, capture_output=True, text=True, check=True
-    ).stdout;
+    out: str = capture(["git", "ls-files", "documents/"], cwd=REPO, check=True).stdout;
     return {line.split("/")[1] for line in out.splitlines() if line.count("/") >= 2};
 }
 
@@ -74,11 +72,8 @@ class TestResetCoversEveryDocumentsSubfolder(unittest.TestCase) {
                 (path / ".gitkeep").write_text("Keep scaffold.\n");
                 (path / "user.txt").write_text("Remove document.\n");
             }
-            result = subprocess.run(
-                [BASH, "-c", bash_block(self.text, "### Documents reset")],
-                cwd=directory,
-                capture_output=True,
-                text=True,
+            result = capture(
+                [BASH, "-c", bash_block(self.text, "### Documents reset")], cwd=directory
             );
             self.assertEqual(result.returncode, 0, result.stderr);
             for path in paths {

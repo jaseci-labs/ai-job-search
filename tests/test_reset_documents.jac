@@ -53,12 +53,7 @@ def populate(base: Path, folders: list[str], files: list[str]) -> Path {
 }
 
 def reset(shell: str | None, base: Path) -> subprocess.CompletedProcess {
-    return subprocess.run(
-        [shell, "-c", bash_block(command("reset"), "### Documents reset")],
-        cwd=base,
-        capture_output=True,
-        text=True,
-    );
+    return capture([shell, "-c", bash_block(command("reset"), "### Documents reset")], cwd=base);
 }
 
 @unittest.skipUnless(BASH, "requires Bash to replay the documented /reset command")

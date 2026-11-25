@@ -26,7 +26,7 @@ def run_guards(base: Path, repository: str | None = None) -> subprocess.Complete
     if repository is not None {
         env["GITHUB_REPOSITORY"] = repository;
     }
-    return subprocess.run(tool("security_guards"), capture_output=True, text=True, env=env);
+    return capture(tool("security_guards"), env=env);
 }
 
 def settings(
@@ -576,11 +576,14 @@ class GitignorePatternBehaviorTests(unittest.TestCase) {
         }
         path: str = folder.replace("<company>_<role>", "acme_data_scientist")
             + filename.replace("<stage>", "technical");
-        result: subprocess.CompletedProcess = subprocess.run(
-            ["git", "-C", str(self.root), "check-ignore", "-v", path],
-            capture_output=True,
-            text=True,
-        );
+        result: subprocess.CompletedProcess = capture([
+            "git",
+            "-C",
+            str(self.root),
+            "check-ignore",
+            "-v",
+            path,
+        ]);
         self.assertEqual(result.returncode, 0, f"{path}: not ignored by the shipped .gitignore");
         self.assertIn("documents/applications/**", result.stdout);
     }

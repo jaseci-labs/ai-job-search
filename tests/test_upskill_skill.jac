@@ -75,7 +75,7 @@ class UpskillSkillSpec(unittest.TestCase) {
                 ]),
                 encoding="utf-8",
             );
-            proc: subprocess.CompletedProcess = subprocess.run(
+            proc: subprocess.CompletedProcess = capture(
                 [
                     *tool("rank_state"),
                     "apply",
@@ -86,8 +86,6 @@ class UpskillSkillSpec(unittest.TestCase) {
                     "--today",
                     "2026-09-03",
                 ],
-                capture_output=True,
-                text=True,
                 encoding="utf-8",
             );
             self.assertEqual(proc.returncode, 0, proc.stderr);

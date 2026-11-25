@@ -26,9 +26,7 @@ class CheckerRepoFixture(unittest.TestCase) {
             for (k, v) in os.environ.items()
             if not k.startswith("GITHUB_")
         };
-        return subprocess.run(
-            tool("check_framework_version"), capture_output=True, text=True, env=env
-        );
+        return capture(tool("check_framework_version"), env=env);
     }
 }
 

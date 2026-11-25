@@ -19,9 +19,7 @@ class CompanionRefTests(UpstreamCheckerRepoFixture) {
     }
 
     def run_tool(name: str, *args: str) -> str {
-        result = subprocess.run(
-            [*tool(name), *args], cwd=self.root, capture_output=True, text=True, encoding="utf-8"
-        );
+        result = capture([*tool(name), *args], cwd=self.root, encoding="utf-8");
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr);
         return result.stdout;
     }

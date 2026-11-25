@@ -41,8 +41,8 @@ graph import {
         lint_skills_passes,
         section,
     }
-    tests._tools ++> tests.test_check_framework_version { root_at, tool }
-    tests._tools ++> tests.test_check_upstream_updates { root_at, tool }
+    tests._tools ++> tests.test_check_framework_version { capture, root_at, tool }
+    tests._tools ++> tests.test_check_upstream_updates { capture, root_at, tool }
     salary_lookup ++> tests.test_convert_salary_excel { format_entry }
     tools.convert_salary_excel ++> tests.test_convert_salary_excel {
         INDEX_PATTERNS,
@@ -53,11 +53,11 @@ graph import {
         parse_sheet,
     }
     salary_lookup ++> tests.test_salary_cli { collect_validation_issues, format_entry }
-    tests._tools ++> tests.test_salary_cli { root_at, tool }
+    tests._tools ++> tests.test_salary_cli { capture, root_at, tool }
     tools.fetch_page as fetch_page ++> tests.test_fetch_deflate;
-    tests._tools ++> tests.test_html_report_command { tool }
+    tests._tools ++> tests.test_html_report_command { capture, tool }
     tools.security_guards ++> tests.test_html_report_command { ALLOWED_PERMISSIONS }
-    tests._tools ++> tests.test_install_portal_hooks { rooted, tool }
+    tests._tools ++> tests.test_install_portal_hooks { capture, rooted, tool }
     tools.job_key ++> tests.test_job_key {
         _LATIN_FOLD,
         is_canonical,
@@ -65,8 +65,8 @@ graph import {
         make_key,
         slugify,
     }
-    tests._tools ++> tests.test_job_key { tool }
-    tests._tools ++> tests.test_lint_skills { root_at, tool }
+    tests._tools ++> tests.test_job_key { capture, tool }
+    tests._tools ++> tests.test_lint_skills { capture, root_at, tool }
     tests._specs ++> tests.test_notion_sync_command {
         NOTION_SYNC,
         between,
@@ -107,7 +107,7 @@ graph import {
         lint_skills_passes,
         section,
     }
-    tests._tools ++> tests.test_rank_rounding_cli { tool }
+    tests._tools ++> tests.test_rank_rounding_cli { capture, tool }
     tools.robots_check as robots_check ++> tests.test_robots_check;
     salary_lookup ++> tests.test_salary_lookup {
         format_entry,
@@ -120,7 +120,7 @@ graph import {
         collect_validation_issues,
     }
     tools.scrape_state as scrape_state ++> tests.test_scrape_state;
-    tests._tools ++> tests.test_upskill_skill { tool }
+    tests._tools ++> tests.test_upskill_skill { capture, tool }
     tests._specs ++> tests.test_upskill_skill {
         SCRAPER,
         between,
@@ -145,8 +145,8 @@ graph import {
         UpstreamCheckerRepoFixture,
         FRONTMATTER,
     }
-    tests._tools ++> tests.test_upstream_crossrefs { tool }
-    tests._tools ++> tests.test_upstream_triage { tool }
+    tests._tools ++> tests.test_upstream_crossrefs { capture, tool }
+    tests._tools ++> tests.test_upstream_triage { capture, tool }
     tools.verify_pdf ++> tests.test_verify_pdf {
         ROOT,
         VerificationError,
@@ -163,13 +163,13 @@ graph import {
     tests._bash as _bash ++> tests.test_bash;
     tests._upstream ++> tests.test_changelog_structure { is_upstream_checkout }
     tests._upstream ++> tests.test_placeholder_integrity { is_upstream_checkout }
-    tests._tools ++> tests.test_rank_state { tool }
+    tests._tools ++> tests.test_rank_state { capture, tool }
     tests._bash ++> tests.test_reset_command { find_bash }
     tests._upstream ++> tests.test_reset_command { is_upstream_checkout }
     tools.check_upstream_updates ++> tests.test_reset_command { get_framework_version_from_text }
     tests._bash ++> tests.test_reset_documents { find_bash }
     tools.security_guards as security_guards ++> tests.test_security_guards;
-    tests._tools ++> tests.test_security_guards { rooted, tool }
+    tests._tools ++> tests.test_security_guards { capture, rooted, tool }
     tests._upstream ++> tests.test_security_guards { is_upstream_checkout }
     tests._upstream ++> tests.test_setup_command { is_upstream_checkout }
     tests._docs ++> tests.test_add_portal_command { command, check }
@@ -213,11 +213,14 @@ graph import {
     tests._tools ++> tests.test_fetch_page { REPO }
     tools.install_portal_clis ++> tests.test_install_portal_clis { discover, unsafe_reason }
     tools.install_portal_clis as install_portal_clis ++> tests.test_install_portal_clis;
-    tests._tools ++> tests.test_install_portal_clis { rooted, tool }
+    tests._tools ++> tests.test_install_portal_clis { capture, rooted, tool }
     tools.check_framework_version as check_framework_version ++> tests.test_check_framework_version;
-    tests._tools ++> tests.test_salary_lookup { root_at, tool }
+    tests._tools ++> tests.test_salary_lookup { capture, root_at, tool }
     tests._tools ++> tests.test_tools_utf8_output { rooted, tool }
     tools.verify_layout as verify_layout ++> tests.test_tools_utf8_output;
     tools.rank_state as rank_state ++> tests.test_rank_command;
-    tests._tools ++> tests.test_robots_check { REPO, tool }
+    tests._tools ++> tests.test_robots_check { REPO, capture, tool }
+    tests._tools ++> tests.test_reset_command { capture }
+    tests._tools ++> tests.test_reset_documents { capture }
+    tests._tools ++> tests.test_setup_tinytex { capture }
 }

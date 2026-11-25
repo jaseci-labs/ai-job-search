@@ -203,9 +203,7 @@ class HtmlReportScript(unittest.TestCase) {
         );
         self.assertIn(rule, settings["permissions"]["allow"]);
         self.assertIn(rule, ALLOWED_PERMISSIONS);
-        result = subprocess.run(
-            [*tool("security_guards")], capture_output=True, text=True, cwd=REPO_ROOT
-        );
+        result = capture([*tool("security_guards")], cwd=REPO_ROOT);
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr);
     }
 
@@ -493,7 +491,7 @@ class HtmlReportScript(unittest.TestCase) {
 )
 class HtmlReportLintIntegration(unittest.TestCase) {
     def test_lint_passes_on_real_repo {
-        result = subprocess.run([*tool("lint_skills")], capture_output=True, text=True);
+        result = capture([*tool("lint_skills")]);
         self.assertEqual(
             result.returncode, 0, f"lint_skills.jac failed:\n{result.stdout}{result.stderr}"
         );

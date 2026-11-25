@@ -43,7 +43,7 @@ class TestTinyTeXPathSnippet(unittest.TestCase) {
             (home / rel).chmod(493);
         }
         path: str = os.environ["PATH"];
-        result = subprocess.run(
+        result = capture(
             [shell, *opts, "-c", tinytex_snippet()],
             env={
                 "HOME": str(home),
@@ -51,8 +51,6 @@ class TestTinyTeXPathSnippet(unittest.TestCase) {
                 "PATH": f"{home}/fakebin:{path}" if fake_os else path,
             },
             cwd=home,
-            capture_output=True,
-            text=True,
         );
         return (result, home, {p.name: p.read_text() for p in home.glob(".*") if p.is_file()});
     }

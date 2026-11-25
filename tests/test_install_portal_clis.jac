@@ -96,11 +96,9 @@ class InstallPortalClis(unittest.TestCase) {
                 if portal {
                     self.add_cli(portal);
                 }
-                proc: subprocess.CompletedProcess = subprocess.run(
+                proc: subprocess.CompletedProcess = capture(
                     [*tool("install_portal_clis"), "--dry-run"],
                     env=rooted(self.root),
-                    capture_output=True,
-                    text=True,
                     encoding="utf-8",
                 );
                 self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr);

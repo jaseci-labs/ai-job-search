@@ -91,12 +91,8 @@ class DependencyHooks(unittest.TestCase) {
                 if "SYSTEMROOT" in os.environ {
                     env["SYSTEMROOT"] = os.environ["SYSTEMROOT"];
                 }
-                proc: any = subprocess.run(
-                    [*tool("install_portal_clis")],
-                    env=rooted(`root, env),
-                    capture_output=True,
-                    text=True,
-                    timeout=30,
+                proc: any = capture(
+                    [*tool("install_portal_clis")], env=rooted(`root, env), timeout=30
                 );
                 self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr);
                 dependency: any = cli / "node_modules/esbuild";
