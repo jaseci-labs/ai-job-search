@@ -1,55 +1,29 @@
-import builtins;
-
 import json;
-
 import shutil;
-
 import subprocess;
-
-import sys;
-
 import tempfile;
-
 import unittest;
-
 import from pathlib { Path }
 
-glob REPO_ROOT: any;
+glob SETTINGS: str = ".claude/settings.json",
+     SKILL: str = ".claude/skills/example/SKILL.md",
+     COMMAND: str = ".claude/commands/setup.md",
+     CLI: str = ".claude/skills/example/cli.ts",
+     FRONTMATTER: str = "---\nname: example\ndescription: Example skill\n",
+     VALID: dict[str, str] = {
+         SETTINGS: json.dumps({"permissions": {"allow": []}}),
+         SKILL: FRONTMATTER + "---\n",
+         COMMAND: "# /setup - Test setup command\n",
+     };
 
-with entry {
-    REPO_ROOT = Path(__file__).resolve().parent.parent;
-}
+def settings_cases -> list[tuple[str, str]];
 
-def run_linter(`root: Path) -> subprocess.CompletedProcess;
-
-class LinterRepoFixture(unittest.TestCase) {
-    def setUp -> any;
-
-    def write_settings(data) -> any;
-}
-
-class SettingsShapeTests(LinterRepoFixture) {
-    def test_valid_settings_pass -> any;
-
-    def test_invalid_json_fails_cleanly -> any;
-
-    def test_non_object_root_fails_cleanly -> any;
-
-    def test_non_object_permissions_fails_cleanly -> any;
-
-    def test_non_list_allow_fails_cleanly -> any;
-}
-
-class SkillAndCommandCheckTests(LinterRepoFixture) {
-    def write_skill(frontmatter: builtins.str) -> any;
-
-    def test_allowed_tools_referencing_a_missing_file_fails -> any;
-
-    def test_allowed_tools_referencing_an_existing_file_passes -> any;
-
-    def test_frontmatter_missing_description_fails -> any;
-
-    def test_command_without_slash_title_fails -> any;
+class LintSkillsTests(unittest.TestCase) {
+    def setUp;
+    def lint(files: dict[str, str]) -> subprocess.CompletedProcess;
+    def test_valid_tree_passes;
+    def test_malformed_settings_fail_cleanly;
+    def test_skill_and_command_checks;
 }
 
 with entry:__main__ {
