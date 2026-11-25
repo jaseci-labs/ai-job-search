@@ -73,7 +73,19 @@ graph import {
     tests._tools ++> tests.test_outcome_followup { tool }
     tools.page_decode ++> tests.test_page_decode { decode_page, declared_codec }
     tools.posting_guard as posting_guard ++> tests.test_posting_guard;
-    tests._tools ++> tests.test_rank_command { tool }
+    tests._specs ++> tests.test_rank_command {
+        EVALUATION,
+        RANK,
+        SCRAPER,
+        between,
+        doc,
+        expect,
+        expect_not,
+        expect_re,
+        h2,
+        lint_skills_passes,
+        section,
+    }
     tests._tools ++> tests.test_rank_rounding_cli { tool }
     tools.robots_check ++> tests.test_robots_check { allowed, has_undecodable_rule, is_robots_body }
     tests._tools ++> tests.test_salary_baseline_cli { tool }
