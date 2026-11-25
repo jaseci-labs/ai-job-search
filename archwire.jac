@@ -36,12 +36,11 @@ graph import {
         parse_numeric_cell,
         parse_sheet,
     }
-    tests._tools ++> tests.test_convert_salary_excel { tool }
-    salary_lookup ++> tests.test_convert_salary_excel_integration {
+    salary_lookup ++> tests.test_salary_cli {
         collect_validation_issues,
         format_entry,
     }
-    tests._tools ++> tests.test_convert_salary_excel_integration { tool }
+    tests._tools ++> tests.test_salary_cli { root_at, tool }
     tools.fetch_page as fetch_page ++> tests.test_fetch_deflate;
     tests._tools ++> tests.test_html_report_command { tool }
     tests._tools ++> tests.test_install_portal_hooks { rooted, tool }
@@ -61,14 +60,6 @@ graph import {
     tests._tools ++> tests.test_rank_command { tool }
     tests._tools ++> tests.test_rank_rounding_cli { tool }
     tools.robots_check ++> tests.test_robots_check { allowed, has_undecodable_rule, is_robots_body }
-    tests._tools ++> tests.test_salary_baseline_cli { tool }
-    tests._tools ++> tests.test_salary_chartsheet_cli { tool }
-    tests._tools ++> tests.test_salary_combined_city_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_company_header_cli { tool }
-    tests._tools ++> tests.test_salary_count_only_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_empty_company_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_grouping_cli { tool }
-    salary_lookup ++> tests.test_salary_lookup;
     salary_lookup ++> tests.test_salary_lookup {
         format_entry,
         normalize,
@@ -79,11 +70,6 @@ graph import {
         validate_data,
         collect_validation_issues,
     }
-    tests._tools ++> tests.test_salary_metadata_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_nonfinite_cli { tool }
-    tests._tools ++> tests.test_salary_notes_sheet_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_unicode_cli { root_at, tool }
-    tests._tools ++> tests.test_salary_wrapped_header_cli { tool }
     tools.scrape_state as scrape_state ++> tests.test_scrape_state;
     tests._tools ++> tests.test_upskill_skill { tool }
     tests.test_check_upstream_updates ++> tests.test_upstream_crossrefs {
