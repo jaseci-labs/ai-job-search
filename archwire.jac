@@ -14,6 +14,7 @@ graph import {
     tools.report_data ++> tools.html_report { STAGES, STATUS_ORDER, load, when }
     tools.security_guards ++> tools.install_portal_clis { FORBIDDEN_SCRIPTS, INSTALL_CONFIG_FILES }
     tools.page_decode ++> tools.posting_guard { decode_page }
+    tools.rank_state ++> tools.job_key { _force_utf8_output, save_state }
     tools.job_key ++> tools.scrape_state { make_key }
     tools.rank_state ++> tools.scrape_state {
         STATE,
