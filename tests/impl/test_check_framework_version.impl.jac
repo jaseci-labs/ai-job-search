@@ -18,24 +18,13 @@ impl CheckerRepoFixture.run_checker -> subprocess.CompletedProcess {
 
 impl FrameworkVersionGateTests.test_edits_need_a_version_bump {
     quoted: str = FRONTMATTER.replace("1.0.0", "\"1.0.0\"");
+    edited: str = BODY + "\nChanged guidance sentence.\n";
     cases: list[tuple[str, str, int]] = [
         ("clean tree", FRONTMATTER + BODY, 0),
-        ("unbumped edit", FRONTMATTER + BODY + "\nA new sentence without a version bump.\n", 1),
-        (
-            "bumped edit",
-            FRONTMATTER.replace("1.0.0", "1.0.1")
-                + BODY
-                + "\nA new sentence with a version bump.\n",
-            0,
-        ),
-        ("same version quoted", quoted + BODY + "\nChanged guidance with the same version.\n", 1),
-        (
-            "same version respaced",
-            FRONTMATTER.replace(": 1", ":  1")
-                + BODY
-                + "\nChanged guidance with the same version.\n",
-            1,
-        ),
+        ("unbumped edit", FRONTMATTER + edited, 1),
+        ("bumped edit", FRONTMATTER.replace("1.0.0", "1.0.1") + edited, 0),
+        ("same version quoted", quoted + edited, 1),
+        ("same version respaced", FRONTMATTER.replace(": 1", ":  1") + edited, 1),
         ("version reformatted alone", quoted + BODY, 0),
     ];
     for (label, text, returncode) in cases {

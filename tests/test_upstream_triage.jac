@@ -10,6 +10,8 @@ glob WORKFLOW: Path = Path(__file__).resolve().parent.parent
      NOT_IN_FORK: str = "touches only files not in this fork",
      CHANGELOG_ONLY: str = "changelog-only footprint in this fork",
      APPLIED: str = "already applied (cherry-picked)",
+     PORTAL: str = "portals/gone.py",
+     LOG: str = "CHANGELOG.md",
      NEW_TOOL: dict[str, str] = {"tools/new_workflow.py": "print('new workflow')\n"};
 
 class TriageRepoFixture(unittest.TestCase) {

@@ -67,7 +67,7 @@ impl main -> int {
         remote = "origin";
         if UPSTREAM_REPO_SLUG.lower() not in get_remote_url(remote).lower() {
             print(
-                f"Warning: Remote '{remote}' does not point to the ai-job-search template repo ({UPSTREAM_REPO_SLUG}), so this check compares your fork against itself and will never report upstream updates. Add the template repo as a remote to track upstream changes, e.g.:\n  git remote add upstream https://github.com/{UPSTREAM_REPO_SLUG}.git"
+                f"Warning: Remote '{remote}' does not point to the ai-job-search template repo ({UPSTREAM_REPO_SLUG}), so this check compares your fork against itself and will never report upstream updates. Add the template repo as a remote to track upstream changes, e.g.:\n  git remote add upstream https://github.com/{UPSTREAM_REPO_SLUG}.git",
             );
         }
     }
@@ -84,7 +84,7 @@ impl main -> int {
     ref: str = f"{remote}/{args.branch}";
     if run_git(["rev-parse", "--verify", ref])[0] != 0 {
         print(
-            f"Error: Ref '{ref}' does not exist. Make sure you fetched and specified the correct branch."
+            f"Error: Ref '{ref}' does not exist. Make sure you fetched and specified the correct branch.",
         );
         return 1;
     }
@@ -114,7 +114,7 @@ impl main -> int {
             errors.append(f"{side} file {rel_path} is missing 'framework_version' in frontmatter.");
         } elif parse_semver(upstream_ver) > parse_semver(local_ver) {
             updates.append(
-                f"  - {Path(rel_path).name}: local {local_ver} < upstream {upstream_ver}\n    Diff command: git diff {ref} -- {rel_path}\n"
+                f"  - {Path(rel_path).name}: local {local_ver} < upstream {upstream_ver}\n    Diff command: git diff {ref} -- {rel_path}\n",
             );
         }
     }
@@ -126,7 +126,7 @@ impl main -> int {
         print(
             "Files present locally but missing from the upstream ref (possibly renamed or deleted upstream):",
             *missing_upstream,
-            sep="\n  - "
+            sep="\n  - ",
         );
         print();
     }
@@ -136,18 +136,18 @@ impl main -> int {
         print("Review these changes to see if they fit your personalized fork!");
     } elif errors or missing_upstream {
         print(
-            f"[WARNING] Framework check incomplete against {ref}: {len(errors)} configuration error(s), {len(missing_upstream)} file(s) missing upstream. Review the messages above before assuming you are up to date."
+            f"[WARNING] Framework check incomplete against {ref}: {len(errors)} configuration error(s), {len(missing_upstream)} file(s) missing upstream. Review the messages above before assuming you are up to date.",
         );
     } elif not fetch_failed {
         print(f"[OK] All framework files are up to date with {ref}!");
     }
     if fetch_failed {
         print(
-            f"[WARNING] Compared against cached {ref} because the fetch failed; the current upstream state could not be checked."
+            f"[WARNING] Compared against cached {ref} because the fetch failed; the current upstream state could not be checked.",
         );
     }
     print(
-        f"\nFor commit-level triage of upstream commits, run: neojac run jobsearch -- upstream_triage --remote {shlex.quote(remote)} --branch {shlex.quote(args.branch)}"
+        f"\nFor commit-level triage of upstream commits, run: neojac run jobsearch -- upstream_triage --remote {shlex.quote(remote)} --branch {shlex.quote(args.branch)}",
     );
     return 0;
 }

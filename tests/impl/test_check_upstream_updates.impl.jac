@@ -77,43 +77,24 @@ impl UpstreamCheckerTests.assert_incomplete -> None {
 }
 
 impl UpstreamCheckerTests.test_remote_fallback_and_fork_warning {
-    current: str = "up to date with origin/master";
-    fallback: list[str] = ["--remote", "upstream"];
-    cases: list[tuple[str, dict[str, str], list[str], list[str], list[str]]] = [
-        (
-            "fork without upstream remote",
-            {"origin": FORK_URL},
-            fallback,
-            [FALLBACK, NOT_TEMPLATE, current],
-            ["up to date with upstream!"],
-        ),
-        (
-            "clone of the template",
-            {"origin": TEMPLATE_URL},
-            fallback,
-            [FALLBACK, current],
-            [NOT_TEMPLATE],
-        ),
-        (
-            "clone with lowercased template url",
-            {"origin": TEMPLATE_URL.lower()},
-            fallback,
-            [FALLBACK, current],
-            [NOT_TEMPLATE],
-        ),
-        (
-            "explicit upstream remote",
-            {"origin": FORK_URL, "upstream": TEMPLATE_URL},
-            [],
-            ["up to date with upstream/master"],
-            [FALLBACK, NOT_TEMPLATE],
-        ),
+    cases: list[tuple[str, dict[str, str], bool]] = [
+        ("fork without upstream remote", {"origin": FORK_URL}, True),
+        ("clone of the template", {"origin": TEMPLATE_URL}, False),
+        ("clone with lowercased template url", {"origin": TEMPLATE_URL.lower()}, False),
+        ("explicit upstream remote", {"origin": FORK_URL, "upstream": TEMPLATE_URL}, False),
     ];
-    for (label, urls, args, shows, lacks) in cases {
+    for (label, urls, warns_of_fork) in cases {
         with self.subTest(label) {
             self.new_repo();
             self.with_remotes(urls);
-            self.check(self.run_checker(*args), shows, lacks);
+            falls_back: bool = "upstream" not in urls;
+            out = self.check(
+                self.run_checker(*(["--remote", "upstream"] if falls_back else [])),
+                [f"up to date with {list(urls)[-1]}/master"],
+                ["up to date with upstream!"],
+            );
+            self.assertEqual(FALLBACK in out, falls_back, out);
+            self.assertEqual(NOT_TEMPLATE in out, warns_of_fork, out);
         }
     }
 }

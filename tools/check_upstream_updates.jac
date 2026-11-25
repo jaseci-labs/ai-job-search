@@ -17,13 +17,10 @@ import from pathlib { Path }
 glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),
      FRAMEWORK_FILES: list[str] = [
          f".claude/skills/job-application-assistant/{name}.md"
-         for name in (
-             "01-candidate-profile 02-behavioral-profile 03-writing-style 04-job-evaluation"
-                 " 05-cv-templates 06-cover-letter-templates 07-interview-prep"
-                 " 08-application-forms 09-web-research SKILL"
-         ).split()
-     ]
-         + ["AGENTS.md"],
+         for name in ("01-candidate-profile 02-behavioral-profile 03-writing-style 04-job-evaluation"
+             " 05-cv-templates 06-cover-letter-templates 07-interview-prep"
+             " 08-application-forms 09-web-research SKILL").split()
+     ] + ["AGENTS.md"],
      UPSTREAM_REPO_SLUG: str = "ai-job-search-dev/ai-job-search";
 
 def run_git(args: list[str]) -> tuple[int, str, str];

@@ -52,66 +52,28 @@ impl TriageTests.test_missing_ref_then_up_to_date {
 }
 
 impl TriageTests.test_relevance_filter {
-    one: str = "**1** worth reviewing";
-    cases: list[tuple[str, dict[str, str], dict[str, str], str
-        | None, bool, list[str], list[str]]] = [
+    cases: list[tuple[str, dict[str, str], dict[str, str], str | None, str | None]] = [
+        ("only removed files", {PORTAL: "1\n"}, {PORTAL: "2\n"}, PORTAL, NOT_IN_FORK),
+        ("kept file", {}, {"kept.py": "print('changed')\n"}, None, None),
         (
-            "only removed files",
-            {"portals/removed_portal.py": "x = 1\n"},
-            {"portals/removed_portal.py": "x = 2\n"},
-            "portals/removed_portal.py",
-            False,
-            [NOT_IN_FORK, "Probably skip"],
-            [],
+            "changelog only",
+            {PORTAL: "1\n", LOG: "- a\n"},
+            {PORTAL: "2\n", LOG: "- b\n"},
+            PORTAL,
+            CHANGELOG_ONLY,
         ),
+        ("new upstream tool", {}, NEW_TOOL, None, None),
         (
-            "kept file",
-            {},
-            {"kept.py": "print('changed')\n"},
-            None,
-            True,
-            ["Worth reviewing", "kept.py"],
-            [],
+            "new file in removed dir",
+            {"gone/src/cli.ts": "a\n"},
+            {"gone/tests/t.ts": "b\n"},
+            "gone",
+            NOT_IN_FORK,
         ),
-        (
-            "changelog-only footprint",
-            {"portals/gone.py": "y = 1\n", "CHANGELOG.md": "- base\n"},
-            {"portals/gone.py": "y = 2\n", "CHANGELOG.md": "- did a thing\n"},
-            "portals/gone.py",
-            False,
-            [CHANGELOG_ONLY],
-            [],
-        ),
-        ("new upstream tool", {}, NEW_TOOL, None, True, [one, "tools/new_workflow.py"], []),
-        (
-            "new file in removed directory",
-            {"portals/gone/cli/src/cli.ts": "run()\n"},
-            {"portals/gone/cli/tests/new.test.ts": "test()\n"},
-            "portals/gone",
-            False,
-            ["**0** worth reviewing", NOT_IN_FORK],
-            [],
-        ),
-        (
-            "new directory inside kept directory",
-            {"portals/kept/cli.ts": "run()\n"},
-            {"portals/kept/tests/new/case.test.ts": "test()\n"},
-            None,
-            True,
-            [one],
-            [],
-        ),
-        (
-            "new tool with changelog",
-            {"CHANGELOG.md": "- base\n"},
-            {**NEW_TOOL, "CHANGELOG.md": "- new workflow tool\n"},
-            None,
-            True,
-            [one],
-            [CHANGELOG_ONLY],
-        ),
+        ("new dir in kept dir", {"kept/cli.ts": "a\n"}, {"kept/tests/new/t.ts": "b\n"}, None, None),
+        ("new tool with changelog", {LOG: "- a\n"}, {**NEW_TOOL, LOG: "- b\n"}, None, None),
     ];
-    for (label, shared, upstream, removed, reviewed, shows, lacks) in cases {
+    for (label, shared, upstream, removed, why) in cases {
         with self.subTest(label) {
             self.new_repo();
             if shared {
@@ -124,8 +86,14 @@ impl TriageTests.test_relevance_filter {
                 self.commit("fork: remove demo portal");
             }
             before = self.git("status", "--porcelain");
-            out = self.triage(shows, lacks);
-            self.assertEqual(pick in out, reviewed, out);
+            if why {
+                self.triage(["**0** worth reviewing", "Probably skip", why], [pick]);
+            } else {
+                self.triage(
+                    ["**1** worth reviewing", pick, *[rel for rel in upstream if rel != LOG]],
+                    [NOT_IN_FORK, CHANGELOG_ONLY],
+                );
+            }
             self.assertEqual(self.git("status", "--porcelain"), before);
             for (rel, text) in upstream.items() {
                 path = self.root / rel;
