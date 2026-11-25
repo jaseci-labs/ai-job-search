@@ -69,8 +69,21 @@ graph import {
     }
     tests._tools ++> tests.test_job_key { tool }
     tests._tools ++> tests.test_lint_skills { root_at, tool }
-    tests._tools ++> tests.test_notion_sync_command { tool }
-    tests._tools ++> tests.test_outcome_followup { tool }
+    tests._specs ++> tests.test_notion_sync_command {
+        NOTION_SYNC,
+        between,
+        doc,
+        expect,
+        expect_not,
+        lint_skills_passes,
+    }
+    tests._specs ++> tests.test_outcome_followup {
+        OUTCOME,
+        between,
+        doc,
+        expect,
+        lint_skills_passes,
+    }
     tools.page_decode ++> tests.test_page_decode { decode_page, declared_codec }
     tools.posting_guard as posting_guard ++> tests.test_posting_guard;
     tests._specs ++> tests.test_apply_host_check {
@@ -123,6 +136,26 @@ graph import {
     tests._tools ++> tests.test_salary_wrapped_header_cli { tool }
     tools.scrape_state as scrape_state ++> tests.test_scrape_state;
     tests._tools ++> tests.test_upskill_skill { tool }
+    tests._specs ++> tests.test_upskill_skill {
+        SCRAPER,
+        between,
+        doc,
+        expect,
+        expect_not,
+        h2,
+        lint_skills_passes,
+    }
+    tests._specs ++> tests.test_company_research_cache {
+        APPLY,
+        EVALUATION,
+        INTERVIEW,
+        doc,
+        expect,
+        expect_re,
+        h2,
+        section,
+    }
+    tests._specs ++> tests.test_outcome_stale { OUTCOME, between, doc, expect }
     tests.test_check_upstream_updates ++> tests.test_upstream_crossrefs {
         UpstreamCheckerRepoFixture,
         FRONTMATTER,
