@@ -1,100 +1,89 @@
-impl rel(path: Path) -> builtins.str {
-    return `str(path.relative_to(ROOT));
+impl fail(path: Path, message: str) -> None {
+    errors.append(f"{path.relative_to(ROOT)}: {message}");
 }
 
 impl check_skill(path: Path) -> None {
-    text: any = path.read_text(encoding="utf-8");
+    text: str = path.read_text(encoding="utf-8");
+    end: int = text.find("\n---", 4);
     if not text.startswith("---\n") {
-        errors.append(f"{rel(path)}: missing YAML frontmatter (file must start with ---)");
+        fail(path, "missing YAML frontmatter (file must start with ---)");
         return;
     }
-    end: any = text.find("\n---", 4);
     if end == -1 {
-        errors.append(f"{rel(path)}: unterminated YAML frontmatter");
+        fail(path, "unterminated YAML frontmatter");
         return;
     }
     try {
         data: any = yaml.safe_load(text[4:end]);
     } except yaml.YAMLError as exc {
-        errors.append(f"{rel(path)}: frontmatter is not valid YAML: {exc}");
+        fail(path, f"frontmatter is not valid YAML: {exc}");
         return;
     }
-    if not isinstance(data, `dict) {
-        errors.append(f"{rel(path)}: frontmatter did not parse to a mapping");
+    if not isinstance(data, dict) {
+        fail(path, "frontmatter did not parse to a mapping");
         return;
     }
     for key in ("name", "description") {
         if not data.get(key) {
-            errors.append(f"{rel(path)}: frontmatter missing required key '{key}'");
+            fail(path, f"frontmatter missing required key '{key}'");
         }
     }
-
     allowed: any = data.get("allowed-tools", "");
-    if isinstance(allowed, `str) {
-        for `match in re.finditer("bun run ([^\\s)]+)", allowed) {
-            target: any = `match.group(1).rstrip("*");
-            if not target or target.endswith("/") {
-                continue;
+    bases: tuple[Path, Path] = (ROOT, ROOT / ".agents");
+    for found in re.finditer("bun run ([^\\s)]+)", allowed if isinstance(allowed, str) else "") {
+        target: str = found.group(1).rstrip("*");
+        if not target or target.endswith("/") {
+            continue;
+        }
+        if "*" in target {
+            if not any([list(base.glob(target)) for base in bases]) {
+                fail(path, f"allowed-tools glob matches no files: {target}");
             }
-            if "*" in target {
-                if not `list(ROOT.glob(target)) and not `list((ROOT / ".agents").glob(target)) {
-                    errors.append(f"{rel(path)}: allowed-tools glob matches no files: {target}");
-                }
-            } else {
-                candidates: any = [ROOT / target, ROOT / ".agents" / target];
-                if not `any(c.is_file() for c in candidates) {
-                    errors.append(
-                        f"{rel(path)}: allowed-tools references a missing file: {target}"
-                    );
-                }
-            }
+        } elif not any([(base / target).is_file() for base in bases]) {
+            fail(path, f"allowed-tools references a missing file: {target}");
         }
     }
 }
 
 impl check_command(path: Path) -> None {
-    lines: any = path.read_text(encoding="utf-8").lstrip().splitlines();
-    first: any = lines[0] if lines else "";
+    lines: list[str] = path.read_text(encoding="utf-8").lstrip().splitlines();
+    first: str = lines[0] if lines else "";
     if not first.startswith("# /") {
-        errors.append(
-            f"{rel(path)}: command file must start with a '# /<name>' title (found: {first[:50]!r})"
-        );
+        fail(path, f"command file must start with a '# /<name>' title (found: {first[:50]!r})");
     }
 }
 
 impl check_settings -> None {
-    path: any = ROOT / ".claude" / "settings.json";
     try {
-        data: any = json.loads(path.read_text(encoding="utf-8"));
+        data: any = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"));
     } except (OSError, json.JSONDecodeError) as exc {
         errors.append(f".claude/settings.json: {exc}");
         return;
     }
-    if not isinstance(data, `dict) {
-        errors.append(".claude/settings.json: expected top-level JSON value to be an object");
-        return;
+    permissions: any = data.get("permissions", {}) if isinstance(data, dict) else None;
+    problem: str = "";
+    if not isinstance(data, dict) {
+        problem = "top-level JSON value to be an object";
+    } elif not isinstance(permissions, dict) {
+        problem = "permissions to be an object";
+    } elif not isinstance(permissions.get("allow"), list) {
+        problem = "permissions.allow to be a list";
     }
-    permissions: any = data.get("permissions", {});
-    if not isinstance(permissions, `dict) {
-        errors.append(".claude/settings.json: expected permissions to be an object");
-        return;
-    }
-    if not isinstance(permissions.get("allow"), `list) {
-        errors.append(".claude/settings.json: expected permissions.allow to be a list");
+    if problem {
+        errors.append(f".claude/settings.json: expected {problem}");
     }
 }
 
-impl main -> builtins.int {
-    skills: any = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
+impl main -> int {
+    skills: list[Path] = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
         + sorted(ROOT.glob(".agents/skills/*/SKILL.md"));
-    commands: any = sorted((ROOT / ".claude" / "commands").glob("*.md"));
+    commands: list[Path] = sorted((ROOT / ".claude" / "commands").glob("*.md"));
     if not skills {
         errors.append("no SKILL.md files found - glob roots are wrong or the tree moved");
     }
     if not commands {
         errors.append("no command files found under .claude/commands/");
     }
-
     for skill in skills {
         check_skill(skill);
     }
@@ -102,7 +91,6 @@ impl main -> builtins.int {
         check_command(command);
     }
     check_settings();
-
     if errors {
         print(f"lint_skills: {len(errors)} failure(s)");
         for err in errors {

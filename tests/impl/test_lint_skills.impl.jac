@@ -1,134 +1,77 @@
-impl run_linter(`root: Path) -> subprocess.CompletedProcess {
-    return subprocess.run([*tool("lint_skills")], capture_output=True, text=True);
+impl settings_cases -> list[tuple[str, str]] {
+    shapes: list[tuple[str, list[any]]] = [
+        ("top-level JSON value to be an object", [[], "settings", 1, None]),
+        (
+            "expected permissions to be an object",
+            [{"permissions": p} for p in ([], "permissions", 1, None)],
+        ),
+        (
+            "expected permissions.allow to be a list",
+            [{"permissions": {"allow": a}} for a in ({}, "Bash(bun run:*)", 1, None)],
+        ),
+    ];
+    return [("{not json", SETTINGS)] + [
+        (json.dumps(data), message)
+        for (message, datas) in shapes
+        for data in datas
+    ];
 }
 
-impl LinterRepoFixture.setUp -> any {
+impl LintSkillsTests.setUp {
     self.root = Path(tempfile.mkdtemp());
     self.addCleanup(shutil.rmtree, self.root, ignore_errors=True);
-
-    tools: any = self.root / "tools";
-    tools.mkdir();
     root_at(self, self.root);
-
-    command: any = self.root / ".claude" / "commands" / "setup.md";
-    command.parent.mkdir(parents=True);
-    command.write_text("# /setup - Test setup command\n", encoding="utf-8");
-
-    skill: any = self.root / ".claude" / "skills" / "example" / "SKILL.md";
-    skill.parent.mkdir(parents=True);
-    skill.write_text("---\nname: example\ndescription: Example skill\n---\n", encoding="utf-8");
-
-    self.settings = self.root / ".claude" / "settings.json";
-    self.write_settings({"permissions": {"allow": []}});
 }
 
-impl LinterRepoFixture.write_settings(data) -> any {
-    self.settings.write_text(json.dumps(data), encoding="utf-8");
+impl LintSkillsTests.lint(files: dict[str, str]) -> subprocess.CompletedProcess {
+    shutil.rmtree(self.root / ".claude", ignore_errors=True);
+    for (rel, text) in {**VALID, **files}.items() {
+        (self.root / rel).parent.mkdir(parents=True, exist_ok=True);
+        (self.root / rel).write_text(text, encoding="utf-8");
+    }
+    result: subprocess.CompletedProcess = subprocess.run(
+        tool("lint_skills"), capture_output=True, text=True
+    );
+    self.assertNotIn("Traceback", result.stderr);
+    return result;
 }
 
-impl SettingsShapeTests.test_valid_settings_pass -> any {
-    result: any = run_linter(self.root);
-
+impl LintSkillsTests.test_valid_tree_passes {
+    result: subprocess.CompletedProcess = self.lint({});
     self.assertEqual(result.returncode, 0, result.stdout + result.stderr);
     self.assertIn("lint_skills: OK", result.stdout);
 }
 
-impl SettingsShapeTests.test_invalid_json_fails_cleanly -> any {
-    self.settings.write_text("{not json", encoding="utf-8");
-
-    result: any = run_linter(self.root);
-
-    self.assertEqual(result.returncode, 1);
-    self.assertIn(".claude/settings.json", result.stdout);
-    self.assertNotIn("Traceback", result.stderr);
-}
-
-impl SettingsShapeTests.test_non_object_root_fails_cleanly -> any {
-    for data in ([], "settings", 1, None) {
-        with self.subTest(data=data) {
-            self.write_settings(data);
-
-            result: any = run_linter(self.root);
-
+impl LintSkillsTests.test_malformed_settings_fail_cleanly {
+    for (text, message) in settings_cases() {
+        with self.subTest(settings=text) {
+            result: subprocess.CompletedProcess = self.lint({SETTINGS: text});
             self.assertEqual(result.returncode, 1);
-            self.assertIn("top-level JSON value to be an object", result.stdout);
-            self.assertNotIn("Traceback", result.stderr);
+            self.assertIn(message, result.stdout);
         }
     }
 }
 
-impl SettingsShapeTests.test_non_object_permissions_fails_cleanly -> any {
-    for permissions in ([], "permissions", 1, None) {
-        with self.subTest(permissions=permissions) {
-            self.write_settings({"permissions": permissions});
-
-            result: any = run_linter(self.root);
-
-            self.assertEqual(result.returncode, 1);
-            self.assertIn("expected permissions to be an object", result.stdout);
-            self.assertNotIn("Traceback", result.stderr);
+impl LintSkillsTests.test_skill_and_command_checks {
+    missing: str = FRONTMATTER
+        + "allowed-tools: Bash(bun run .claude/skills/example/DOES_NOT_EXIST.ts *)\n---\n";
+    present: str = FRONTMATTER + f"allowed-tools: Bash(bun run {CLI} *)\n---\n";
+    cases: list[tuple[dict[str, str], list[str]]] = [
+        ({SKILL: missing}, ["allowed-tools references a missing file", "DOES_NOT_EXIST.ts"]),
+        ({SKILL: present, CLI: "// present\n"}, []),
+        (
+            {SKILL: "---\nname: example\ndescription:\n---\n"},
+            ["missing required key 'description'"],
+        ),
+        ({COMMAND: "# setup - missing the slash\n"}, ["must start with a '# /<name>' title"]),
+    ];
+    for (files, messages) in cases {
+        with self.subTest(files=files) {
+            result: subprocess.CompletedProcess = self.lint(files);
+            self.assertEqual(result.returncode, 1 if messages else 0, result.stdout);
+            for message in messages {
+                self.assertIn(message, result.stdout);
+            }
         }
     }
-}
-
-impl SettingsShapeTests.test_non_list_allow_fails_cleanly -> any {
-    for allow in ({}, "Bash(bun run:*)", 1, None) {
-        with self.subTest(allow=allow) {
-            self.write_settings({"permissions": {"allow": allow}});
-
-            result: any = run_linter(self.root);
-
-            self.assertEqual(result.returncode, 1);
-            self.assertIn("expected permissions.allow to be a list", result.stdout);
-            self.assertNotIn("Traceback", result.stderr);
-        }
-    }
-}
-
-impl SkillAndCommandCheckTests.write_skill(frontmatter: builtins.str) -> any {
-    skill: any = self.root / ".claude" / "skills" / "example" / "SKILL.md";
-    skill.write_text(frontmatter, encoding="utf-8");
-}
-
-impl SkillAndCommandCheckTests.test_allowed_tools_referencing_a_missing_file_fails -> any {
-    self.write_skill(
-        "---\nname: example\ndescription: Example skill\nallowed-tools: Bash(bun run .claude/skills/example/DOES_NOT_EXIST.ts *)\n---\n",
-    );
-
-    result: any = run_linter(self.root);
-
-    self.assertEqual(result.returncode, 1, result.stdout + result.stderr);
-    self.assertIn("allowed-tools references a missing file", result.stdout);
-    self.assertIn("DOES_NOT_EXIST.ts", result.stdout);
-}
-
-impl SkillAndCommandCheckTests.test_allowed_tools_referencing_an_existing_file_passes -> any {
-    target: any = self.root / ".claude" / "skills" / "example" / "cli.ts";
-    target.write_text("// present\n", encoding="utf-8");
-    self.write_skill(
-        "---\nname: example\ndescription: Example skill\nallowed-tools: Bash(bun run .claude/skills/example/cli.ts *)\n---\n",
-    );
-
-    result: any = run_linter(self.root);
-
-    self.assertEqual(result.returncode, 0, result.stdout + result.stderr);
-}
-
-impl SkillAndCommandCheckTests.test_frontmatter_missing_description_fails -> any {
-    self.write_skill("---\nname: example\ndescription:\n---\n");
-
-    result: any = run_linter(self.root);
-
-    self.assertEqual(result.returncode, 1);
-    self.assertIn("missing required key 'description'", result.stdout);
-}
-
-impl SkillAndCommandCheckTests.test_command_without_slash_title_fails -> any {
-    command: any = self.root / ".claude" / "commands" / "setup.md";
-    command.write_text("# setup - missing the slash\n", encoding="utf-8");
-
-    result: any = run_linter(self.root);
-
-    self.assertEqual(result.returncode, 1);
-    self.assertIn("must start with a '# /<name>' title", result.stdout);
 }

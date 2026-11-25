@@ -1,78 +1,24 @@
-import builtins;
-
-import from jaclang.comptime { target }
-
 import io;
-
 import json;
-
 import shutil;
-
 import subprocess;
-
 import sys;
-
 import unittest;
-
 import from contextlib { redirect_stdout }
-
 import from pathlib { Path }
-
 import from tempfile { TemporaryDirectory }
-
-glob REPO_ROOT: any;
-
-with entry {
-    REPO_ROOT = Path(__file__).resolve().parents[1];
-}
-
-def install(*args_) -> any;
-
-class FakeRun(builtins.object) {
-    def init(fail=());
-
-    def __call__(argv, cwd) -> any;
-}
+import from unittest { mock }
 
 class InstallPortalClis(unittest.TestCase) {
-    def setUp -> any;
-
-    def add_cli(name, manifest=None) -> any;
-
-    def test_discovers_every_cli_on_the_ci_glob -> any;
-
-    def test_lifecycle_script_is_skipped_not_run -> any;
-
-    def test_trusted_dependencies_is_unsafe -> any;
-    def test_workspaces_is_unsafe -> any;
-
-    def test_bunfig_is_unsafe -> any;
-
-    def test_npmrc_is_unsafe -> any;
-
-    def test_bun_install_never_runs_lifecycle_scripts -> any;
-
-    def test_one_failure_does_not_stop_the_rest -> any;
-
-    def test_dry_run_runs_nothing -> any;
-
-    def run_script -> any;
-
-    def test_cli_with_no_portals_installed_succeeds -> any;
-
-    def test_cli_dry_run_lists_a_copied_in_portal -> any;
-}
-
-class FindBun(unittest.TestCase) {
-    def setUp -> any;
-
-    def test_find_bun_prefers_path -> any;
-
-    def test_find_bun_falls_back_to_candidate_directory -> any;
-
-    def test_find_bun_returns_none_when_missing -> any;
-
-    def test_missing_bun_message_suggests_export -> any;
+    def setUp;
+    def add_cli(name: str, manifest: dict[str, any] = {}, base: Path | None = None) -> Path;
+    def install(base: Path, fail: str = "", dry_run: bool = False) -> tuple[int, list[any]];
+    def test_discovers_every_cli_on_the_ci_glob;
+    def test_install_runs_bun_only_for_safe_manifests;
+    def test_manifests_that_run_code_or_reconfigure_the_install_are_unsafe;
+    def test_cli_dry_run;
+    def test_find_bun;
+    def test_missing_bun_message_suggests_export;
 }
 
 with entry:__main__ {
