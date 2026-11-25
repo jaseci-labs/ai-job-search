@@ -227,7 +227,6 @@ impl ExtractorFailure.test_failing_extractor_raises_a_skippable_error_naming_bot
             "libc++abi: terminating due to uncaught exception of type std::out_of_range: basic_string",
         ),
     ] {
-        verify_layout.find_pdftotext.cache_clear();
         failure: any = subprocess.CalledProcessError(code, "pdftotext", stderr=stderr);
         with self.subTest(stderr=stderr), patch(
             "tools.verify_layout.shutil.which", return_value="/usr/bin/pdftotext"
