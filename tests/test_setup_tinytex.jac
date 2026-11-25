@@ -1,56 +1,27 @@
-import operator;
-
 import os;
-
 import re;
-
 import shutil;
-
 import subprocess;
-
 import tempfile;
-
 import unittest;
-
 import from pathlib { Path }
 
-glob REPO: any;
+glob DARWIN: str = "Library/TinyTeX/bin/universal-darwin";
 
-glob SETUP: any;
+def tinytex_snippet -> str;
 
-glob INSTALL_LINES: any;
-
-with entry {
-    REPO = Path(__file__).resolve().parent.parent;
-    SETUP = REPO / "SETUP.md";
-    INSTALL_LINES = re.compile("^\\s*(curl |sh .*install-bin-unix\\.sh)");
-}
-
-def tinytex_snippet -> any;
-
-@unittest.skipIf(
-    operator.eq(os.name, "nt"), "the snippet targets macOS and Linux; Windows uses MiKTeX"
-)
+@unittest.skipIf(os.name == "nt", "the snippet targets macOS and Linux; Windows uses MiKTeX")
 class TestTinyTeXPathSnippet(unittest.TestCase) {
-    def run_snippet(shell, layout, *shell_opts_, existing=(), fake_os=None) -> any;
+    def which(name: str) -> str;
+    def run_snippet(
+        shell: str,
+        layout: str | None,
+        opts: list[str] = [],
+        existing: list[str] = [],
+        fake_os: str = "",
+    ) -> tuple[subprocess.CompletedProcess, Path, dict[str, str]];
 
-    def assert_persists_bin_dir(shell, *shell_opts__) -> any;
-
-    def assert_writes_nothing_without_install(shell, *shell_opts___) -> any;
-
-    def test_bash_persists_the_tinytex_bin_dir -> any;
-
-    def test_bash_writes_nothing_when_tinytex_is_missing -> any;
-
-    def test_failglob_bash_persists_the_tinytex_bin_dir -> any;
-
-    def test_bash_appends_to_the_startup_file_bash_reads -> any;
-
-    def test_zsh_persists_the_tinytex_bin_dir -> any;
-
-    def test_zsh_writes_nothing_when_tinytex_is_missing -> any;
-}
-
-with entry:__main__ {
-    unittest.main();
+    def test_shells_persist_the_tinytex_bin_dir;
+    def test_shells_write_nothing_when_tinytex_is_missing;
+    def test_bash_appends_to_the_startup_file_bash_reads;
 }

@@ -1,3 +1,6 @@
-impl AddTemplateKeepsIntermediatesInBuild.test_latex_command_redirects_to_build_and_returns_a_fresh_pdf -> any {
-    self.assertIn(LATEX_COMMAND, ADD_TEMPLATE.read_text(encoding="utf-8"));
+impl AddTemplateKeepsIntermediatesInBuild.test_latex_command_redirects_to_build_and_returns_a_fresh_pdf {
+    self.assertIn(
+        "rm -f <file>.pdf && mkdir -p build && lualatex -interaction=nonstopmode -output-directory=build <file>.tex && mv build/<file>.pdf ./",
+        command("add-template"),
+    );
 }

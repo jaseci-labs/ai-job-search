@@ -1,67 +1,41 @@
-import from jaclang.comptime { target as target_ }
-
 import errno;
-
-import os;
-
-import re;
-
 import shutil;
-
 import subprocess;
-
 import unittest;
-
 import from pathlib { Path }
-
 import from tempfile { TemporaryDirectory }
 
-glob COMMAND: any;
+glob FOLDERS: list[str] = [
+         "cv",
+         "linkedin",
+         "diplomas",
+         "references",
+         "projects",
+         "postings",
+         "applications",
+     ],
+     BASH: str | None = find_bash(),
+     SHELLS: list[str] = [
+         path
+         for path in (BASH, shutil.which("zsh"), shutil.which("sh"), shutil.which("dash"))
+         if path
+     ],
+     SYMLINKS: bool = bool(BASH) and symlinks_available();
 
-glob FOLDERS: any;
+def symlinks_available -> bool;
 
-glob BASH: any;
+def populate(base: Path, folders: list[str], files: list[str]) -> Path;
 
-glob SHELLS: any;
-
-glob SYMLINKS: any;
-
-with entry {
-    COMMAND = Path(__file__).resolve().parent.parent / ".claude/commands/reset.md";
-    FOLDERS = ("cv", "linkedin", "diplomas", "references", "projects", "postings", "applications");
-    BASH = find_bash();
-    SHELLS = [
-        path
-        for path in (BASH, shutil.which("zsh"), shutil.which("sh"), shutil.which("dash"))
-        if path
-    ];
-}
-
-def symlinks_available -> any;
-
-with entry {
-    SYMLINKS = `bool(BASH) and symlinks_available();
-}
+def reset(shell: str | None, base: Path) -> subprocess.CompletedProcess;
 
 @unittest.skipUnless(BASH, "requires Bash to replay the documented /reset command")
 class ResetDocuments(unittest.TestCase) {
-    def reset_script -> any;
-
-    def run_reset(populated) -> any;
-
-    def run_reset_with(shell, populated) -> any;
-
-    def test_all_document_entries_are_removed_without_removing_the_scaffold -> any;
-
-    def test_empty_document_folders_remain_usable -> any;
-
-    def test_a_missing_folder_is_skipped_and_the_rest_are_still_cleared -> any;
-
-    def test_block_uses_no_bash_only_builtins -> any;
+    def test_documents_are_removed_and_the_scaffold_is_kept;
+    def test_block_uses_no_bash_only_builtins;
 
     @unittest.skipUnless(SYMLINKS, "requires filesystem symlinks and Windows symlink privilege")
-    def test_symlinked_roots_stop_before_any_deletion -> any;
+    def test_symlinked_roots_stop_before_any_deletion;
 
     @unittest.skipUnless(SYMLINKS, "requires filesystem symlinks and Windows symlink privilege")
-    def test_internal_symlink_is_removed_without_following_its_target -> any;
+    def test_internal_symlink_is_removed_without_following_its_target;
 }
