@@ -1,48 +1,24 @@
 import re;
-
 import unittest;
-
 import from pathlib { Path }
 
-glob REPO: any;
+glob CLAUDE: Path = Path(__file__).resolve().parent.parent / ".claude",
+     SKILL_DIR: str = "skills/job-application-assistant",
+     AGENTS: tuple[str, ...] = ("agents/posting-fetcher.md", "agents/posting-scorer.md");
 
-glob APPLY: any;
+def doc(name: str) -> str;
 
-glob INTERVIEW: any;
+"""The first group of `pattern` in `text`; the test fails when the section is missing."""
+def section(text: str, pattern: str, flags: int = re.DOTALL) -> str;
 
-glob RESEARCH: any;
-
-with entry {
-    REPO = Path(__file__).resolve().parent.parent;
-    APPLY = REPO / ".claude" / "commands" / "apply.md";
-    INTERVIEW = REPO / ".claude" / "commands" / "interview.md";
-    RESEARCH = REPO / ".claude" / "skills" / "job-application-assistant" / "09-web-research.md";
-}
-
-class ArchiveWiring(unittest.TestCase) {
-    def setUp -> any;
-
-    def test_archive_stores_cleaned_text_with_counts_only -> any;
-}
-
-class InterviewWiring(unittest.TestCase) {
-    def test_step1_gates_the_archived_posting_in_text_mode -> any;
-}
-
-class OtherFrontDoors(unittest.TestCase) {
-    def test_skill_step1_names_the_gate -> any;
-
-    def test_outcome_fresh_fetch_is_gated -> any;
-
-    def test_interview_fetch_fallback_is_gated -> any;
-
-    def test_scratchpad_is_guarded_everywhere_the_gate_writes -> any;
-
-    def test_fetch_agents_can_discover_installed_portals -> any;
-}
-
-class TrustBoundaryWiring(unittest.TestCase) {
-    def test_09_trust_boundary_names_the_gate -> any;
+class GateWiring(unittest.TestCase) {
+    def test_archive_stores_cleaned_text_with_counts_only;
+    def test_interview_step1_gates_the_archived_posting_and_its_fetch_fallback;
+    def test_skill_step1_names_the_gate;
+    def test_outcome_fresh_fetch_is_gated;
+    def test_scratchpad_is_guarded_everywhere_the_gate_writes;
+    def test_fetch_agents_can_discover_installed_portals;
+    def test_09_trust_boundary_names_the_gate;
 }
 
 with entry:__main__ {

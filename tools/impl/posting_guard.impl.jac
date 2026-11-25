@@ -1,15 +1,13 @@
-impl _inside_repo(path: Path) -> builtins.bool {
-    candidate: any = path.expanduser();
-    if not candidate.is_absolute() {
-        candidate = Path.cwd() / candidate;
+impl _inside_repo(path: Path) -> bool {
+    probe: Path = path.expanduser();
+    if not probe.is_absolute() {
+        probe = Path.cwd() / probe;
     }
-    probe: any = candidate;
     while not probe.exists() {
-        parent: any = probe.parent;
-        if parent == probe {
+        if probe.parent == probe {
             return False;
         }
-        probe = parent;
+        probe = probe.parent;
     }
     for ancestor in (probe, *probe.parents) {
         try {
@@ -23,154 +21,109 @@ impl _inside_repo(path: Path) -> builtins.bool {
     return False;
 }
 
-impl _fold(text: builtins.str) -> builtins.str {
+impl _fold(text: str) -> str {
     text = text.replace("\r\n", "\n").replace("\r", "\n");
     text = re.sub("[ \\t\\xa0\\f\\v]+", " ", text);
     text = re.sub(" *\\n *", "\n", text);
-    text = re.sub("\\n{3,}", "\n\n", text);
-    return text.strip();
+    return re.sub("\\n{3,}", "\n\n", text).strip();
 }
 
-impl clean_text(text: builtins.str) -> any {
-    counts: any = {};
-    flagged: any = 0;
-    for (key, chars) in (
-        ("zero_width", ZERO_WIDTH),
-        ("bidi", BIDI),
-        ("format", FORMAT),
-        ("bom", BOM),
-    ) {
-        n: any = sum(text.count(c) for c in chars);
-        if n {
-            counts[key] = n;
-        }
-    }
-    flags: any = RGI_TAG_FLAG.findall(text);
-    unflagged: any = RGI_TAG_FLAG.sub("", text);
-    tags: any = sum(1 for ch in unflagged if "󠀀" <= ch <= "󠁿");
-    if tags {
-        counts["tag"] = tags;
-    }
-    variation: any = len(VARIATION.findall(text));
-    if variation {
-        counts["variation"] = variation;
-    }
+impl _tag_text(run: str) -> str {
+    return "".join([chr(ord(c) - TAG_BASE) for c in run if 32 <= ord(c) - TAG_BASE < 127]);
+}
+
+impl _selector_text(run: str) -> str {
+    data: bytes = bytes([
+        ord(c) - 0xFE00 if ord(c) <= 0xFE0F else ord(c) - 0xE0100 + 16
+        for c in run
+    ]);
+    return "".join([c for c in data.decode("utf-8", errors="replace") if c.isprintable()]);
+}
+
+impl clean_text(text: str) -> tuple[str, dict[str, any]] {
+    has_flag: bool = RGI_TAG_FLAG.search(text) is not None;
+    tag_runs: list[str] = TAG_RUN.findall(RGI_TAG_FLAG.sub("", text));
+    selector_runs: list[str] = VARIATION_RUN.findall(text);
+    sizes: dict[str, int] = {
+        key: sum([text.count(c) for c in chars])
+        for (key, chars) in COUNTED.items()
+    };
+    sizes["tag"] = sum([len(run) for run in tag_runs]);
+    sizes["variation"] = len(VARIATION.findall(text));
+    flagged: int = 0;
     for (i, ch) in enumerate(text) {
-        if ch in BIDI_TAMPER {
+        splits_word: bool = (ch in ZERO_WIDTH or ch == BOM)
+            and text[max(i - 1, 0):i].isalpha()
+            and text[i + 1:i + 2].isalpha();
+        if ch in BIDI_TAMPER or splits_word {
             flagged += 1;
-        } elif ch in ZERO_WIDTH or ch == BOM {
-            before: any = text[i - 1] if i else "";
-            after: any = text[i + 1] if i + 1 < len(text) else "";
-            if before.isalpha() and after.isalpha() {
-                flagged += 1;
-            }
         }
     }
-    invisible_text: any = [];
-    run: any;
-    for run in TAG_RUN.findall(unflagged) {
-        decoded: any = "".join(
-            chr(ord(c) - 917504) for c in run if 32 <= ord(c) - 917504 < 127
-        ).strip();
-        if decoded {
-            invisible_text.append(decoded[:LINE_MAX]);
-        }
-    }
-    for run in VARIATION_RUN.findall(text) {
-        data: any = `bytes(
-            ord(c) - 65024 if ord(c) <= 65039 else ord(c) - 917760 + 16 for c in run
-        );
-        decoded = "".join(
-            c for c in data.decode("utf-8", errors="replace") if c.isprintable()
-        ).strip();
-        if decoded {
-            invisible_text.append(decoded[:LINE_MAX]);
-        }
-    }
+    spelled: list[str] = [_tag_text(run).strip() for run in tag_runs] + [
+        _selector_text(run).strip()
+        for run in selector_runs
+    ];
+    strip: dict[int, any] = str.maketrans("", "", INVISIBLE);
     text = VARIATION.sub("", text);
-    if flags {
-        strip: any = {ord(c): None for c in INVISIBLE};
-        pieces: any;
-        last: any;
-        (pieces, last) = ([], 0);
-        for m in RGI_TAG_FLAG.finditer(text) {
-            pieces.append(text[last:m.start()].translate(strip));
-            pieces.append(m.group(0));
-            last = m.end();
-        }
-        pieces.append(text[last:].translate(strip));
-        text = "".join(pieces);
+    if has_flag {
+        kept: list[str] = RGI_TAG_FLAG.findall(text) + [""];
+        text = "".join([
+            part.translate(strip) + flag
+            for (part, flag) in zip(RGI_TAG_FLAG.split(text), kept)
+        ]);
     } else {
-        text = text.translate({ord(c): None for c in INVISIBLE});
+        text = text.translate(strip);
     }
     return (
         _fold(text),
-        {"invisible_chars": counts, "invisible_flagged": flagged, "invisible_text": invisible_text},
+        {
+            "invisible_chars": {key: n for (key, n) in sizes.items() if n},
+            "invisible_flagged": flagged,
+            "invisible_text": [s[:LINE_MAX] for s in spelled if s],
+        },
     );
 }
 
-impl _attrs(raw: builtins.str) -> builtins.dict {
-    out: any = {};
-    for m in ATTR.finditer(raw) {
-        value: any = m.group(2)
-            if m.group(2) is not None
-            else m.group(3) if m.group(3) is not None else m.group(4) or "";
-        out[m.group(1).lower()] = value;
-    }
-    return out;
+impl _attrs(raw: str) -> dict[str, str] {
+    return {
+        m.group(1).lower(): "" if m.lastindex == 1 else m.group(m.lastindex)
+        for m in ATTR.finditer(raw)
+    };
 }
 
-impl _style(attrs: builtins.dict) -> builtins.str {
-    return CSS_COMMENT.sub("", html.unescape(attrs.get("style", "")));
-}
-
-impl _is_hidden(raw_attrs: builtins.str) -> builtins.bool {
-    attrs: any = _attrs(raw_attrs);
+impl _is_hidden(raw_attrs: str) -> bool {
+    attrs: dict[str, str] = _attrs(raw_attrs);
     if "hidden" in attrs or attrs.get("aria-hidden", "").strip().lower() == "true" {
         return True;
     }
-    style: any = _style(attrs);
-    if HIDDEN_STYLE.search(style) {
-        return True;
-    }
-    return `bool(COLLAPSED_BOX.search(style) and CLIPPED.search(style));
+    style: str = CSS_COMMENT.sub("", html.unescape(attrs.get("style", "")));
+    return bool(
+        HIDDEN_STYLE.search(style) or (COLLAPSED_BOX.search(style) and CLIPPED.search(style))
+    );
 }
 
-impl clean_html(markup: builtins.str) -> any {
-    hidden_parts: any;
-    hidden_blocks: any;
-    visible: any;
-    hidden_buf: any;
-    stack: any;
-    nav_at: any;
-    hidden_at: any;
-    hidden_parts = [];
-    hidden_blocks = [];
+impl clean_html(markup: str) -> tuple[str, dict[str, any]] {
+    hidden_parts: list[str] = [];
+    hidden_blocks: list[str] = [];
+    visible: list[str] = [];
+    hidden_buf: list[str] = [];
+    stack: list[str] = [];
+    nav_at: set[int] = set();
+    hidden_at: int | None = None;
+    pos: int = 0;
 
-    def collect(`match) -> any {
-        inner: any = re.sub("<!--|-->", " ", `match.group(0));
-        inner = re.sub("<[^>]+>", " ", inner);
-        hidden_parts.append(html.unescape(inner));
+    def collect(found: re.Match[str]) -> str {
+        inner: str = re.sub("<!--|-->", " ", found.group(0));
+        hidden_parts.append(html.unescape(re.sub("<[^>]+>", " ", inner)));
         return " ";
     }
 
-    markup = PRESTRIP.sub(" ", markup);
-    markup = COMMENT.sub(collect, markup);
-    markup = DROP_BLOCKS.sub(collect, markup);
-
-    visible = [];
-    hidden_buf = [];
-    stack = [];
-    nav_at = set[any]();
-    hidden_at = None;
-    pos: any = 0;
-
-    def emit(text) -> any {
+    def emit(text: str) -> None {
         (visible if hidden_at is None else hidden_buf).append(text);
     }
 
-    def flush_hidden -> any {
-        block: any = _fold(html.unescape("".join(hidden_buf)));
+    def flush_hidden -> None {
+        block: str = _fold(html.unescape("".join(hidden_buf)));
         hidden_buf.clear();
         hidden_at = None;
         if block {
@@ -179,7 +132,7 @@ impl clean_html(markup: builtins.str) -> any {
         }
     }
 
-    def pop_to(index) -> any {
+    def pop_to(index: int) -> None {
         del stack[index:];
         nav_at = {i for i in nav_at if i < index};
         if hidden_at is not None and hidden_at >= len(stack) {
@@ -187,174 +140,126 @@ impl clean_html(markup: builtins.str) -> any {
         }
     }
 
-    def last_index(name) -> any {
-        for i in range(len(stack) - 1, -1, -1) {
-            if stack[i] == name {
-                return i;
-            }
-        }
-        return None;
-    }
-
+    markup = DROP_BLOCKS.sub(collect, COMMENT.sub(collect, PRESTRIP.sub(" ", markup)));
     for m in TAG.finditer(markup) {
         emit(markup[pos:m.start()]);
         pos = m.end();
-        closing: any;
-        name: any;
-        raw_attrs: any;
-        (closing, name, raw_attrs) = (m.group(1), m.group(2).lower(), m.group(3));
+        name: str = m.group(2).lower();
+        raw_attrs: str = m.group(3);
         if name in BLOCK {
             emit("\n");
         }
-        if closing {
-            index: any = last_index(name);
-            if index is not None {
-                pop_to(index);
+        if m.group(1) {
+            if name in stack {
+                pop_to(len(stack) - 1 - stack[::-1].index(name));
             }
             continue;
         }
-        is_nav: any = `bool(nav_at)
-            or operator.eq(name, "nav")
-            or operator.eq(_attrs(raw_attrs).get("role", "").strip().lower(), "navigation");
-        is_hidden: any = hidden_at is not None or _is_hidden(raw_attrs);
-        if is_hidden and not is_nav {
-            for u in URL.findall(html.unescape(raw_attrs)) {
-                hidden_parts.append(u);
-            }
+        is_nav: bool = bool(nav_at)
+            or name == "nav"
+            or _attrs(raw_attrs).get("role", "").strip().lower() == "navigation";
+        hides: bool = _is_hidden(raw_attrs);
+        if (hidden_at is not None or hides) and not is_nav {
+            hidden_parts.extend(URL.findall(html.unescape(raw_attrs)));
         }
         if name in VOID {
             continue;
         }
-        if name in IMPLIED_END and stack and stack[-1] == name {
-            pop_to(len(stack) - 1);
-        } elif name in CLOSES_P and stack and stack[-1] == "p" {
+        if stack
+            and (
+                (name in IMPLIED_END and stack[-1] == name)
+                or (name in CLOSES_P and stack[-1] == "p")
+            )
+        {
             pop_to(len(stack) - 1);
         }
         stack.append(name);
-        idx: any = len(stack) - 1;
         if is_nav {
-            nav_at.add(idx);
+            nav_at.add(len(stack) - 1);
         }
-        if hidden_at is None and _is_hidden(raw_attrs) {
-            hidden_at = idx;
+        if hidden_at is None and hides {
+            hidden_at = len(stack) - 1;
         }
     }
     emit(markup[pos:]);
     if hidden_at is not None {
         flush_hidden();
     }
-
-    text: any = html.unescape("".join(visible));
-    return (_fold(text), {"hidden_blocks": hidden_blocks, "hidden_text": "\n".join(hidden_parts)});
+    return (
+        _fold(html.unescape("".join(visible))),
+        {"hidden_blocks": hidden_blocks, "hidden_text": "\n".join(hidden_parts)},
+    );
 }
 
-impl _excerpt(line: builtins.str, at: builtins.int) -> builtins.str {
+impl _excerpt(line: str, at: int) -> str {
     if len(line) <= LINE_MAX {
         return line;
     }
-    lead: any = LINE_MAX // 3;
-    start: any = max(0, at - lead);
-    end: any = min(len(line), start + LINE_MAX);
-    start = max(0, end - LINE_MAX);
-    head: any = "…" if start else "";
-    tail: any = "…" if end < len(line) else "";
-    return f"{head}{line[start:end]}{tail}";
+    end: int = min(len(line), max(0, at - LINE_MAX // 3) + LINE_MAX);
+    start: int = max(0, end - LINE_MAX);
+    return ("…" if start else "") + line[start:end] + ("…" if end < len(line) else "");
 }
 
-impl scan(visible: builtins.str, hidden: builtins.str) -> builtins.dict {
-    stripped: any;
-    seen: any = set[any]();
-    instruction_like: any = [];
+impl _instruction_at(line: str) -> int | None {
+    for pattern in INSTRUCTION_PATTERNS {
+        found: re.Match[str] | None = pattern.search(line);
+        if found {
+            return found.start();
+        }
+    }
+    return None;
+}
+
+impl scan(visible: str, hidden: str) -> dict[str, any] {
+    instruction_like: dict[str, str] = {};
     for line in visible.splitlines() + hidden.splitlines() {
-        stripped = line.strip();
-        if not stripped or stripped in seen {
-            continue;
-        }
-        `match: any = next(
-            (m for m in (p.search(stripped) for p in INSTRUCTION_PATTERNS) if m), None
-        );
-        if `match {
-            seen.add(stripped);
-            instruction_like.append(_excerpt(stripped, `match.start()));
+        stripped: str = line.strip();
+        if stripped and stripped not in instruction_like {
+            at: int | None = _instruction_at(stripped);
+            if at is not None {
+                instruction_like[stripped] = _excerpt(stripped, at);
+            }
         }
     }
-    hidden_urls: any = [];
-    for url in URL.findall(hidden) {
-        if url not in hidden_urls {
-            hidden_urls.append(url);
-        }
-    }
-    homoglyphs: any = [];
-    for word in WORD.findall(visible + "\n" + hidden) {
-        if LATIN.search(word) and CONFUSABLE.search(word) and word not in homoglyphs {
-            homoglyphs.append(word);
-        }
-    }
+    mixed: list[str] = [
+        word
+        for word in WORD.findall(visible + "\n" + hidden)
+        if LATIN.search(word) and CONFUSABLE.search(word)
+    ];
     return {
-        "instruction_like": instruction_like,
-        "hidden_urls": hidden_urls,
+        "instruction_like": list(instruction_like.values()),
+        "hidden_urls": list(dict.fromkeys(URL.findall(hidden))),
         "visible_url_count": len(URL.findall(visible)),
-        "homoglyph_runs": homoglyphs,
+        "homoglyph_runs": list(dict.fromkeys(mixed)),
     };
 }
 
-impl _plural(n: builtins.int, one: builtins.str, many: builtins.str) -> builtins.str {
-    return f"{n} {one if n == 1 else many}";
+impl _phrases(counts: list[int], names: list[tuple[str, str]]) -> list[str] {
+    return [f"{n} {one if n == 1 else many}" for (n, (one, many)) in zip(counts, names) if n];
 }
 
-impl verdict(findings: builtins.dict) -> builtins.str {
+impl verdict(findings: dict[str, any]) -> str {
     if findings.get("verdict") == NO_TEXT_VERDICT {
         return NO_TEXT_VERDICT;
     }
-    alarms: any = [];
-    n: any = len(findings.get("instruction_like") or []);
-    if n {
-        alarms.append(_plural(n, "instruction-like line", "instruction-like lines"));
-    }
-    n = `int(findings.get("invisible_flagged") or 0);
-    if n {
-        alarms.append(
-            _plural(n, "invisible character inside words", "invisible characters inside words")
-        );
-    }
-    n = `int((findings.get("invisible_chars") or {}).get("tag") or 0);
-    if n {
-        alarms.append(
-            _plural(
-                n,
-                "tag character (text hidden from the reader)",
-                "tag characters (text hidden from the reader)",
-            ),
-        );
-    }
-    n = len(findings.get("invisible_text") or []);
-    if n {
-        alarms.append(
-            _plural(
-                n,
-                "string spelled in invisible characters",
-                "strings spelled in invisible characters",
-            ),
-        );
-    }
-    n = len(findings.get("homoglyph_runs") or []);
-    if n {
-        alarms.append(_plural(n, "mixed-script word", "mixed-script words"));
-    }
-
-    context: any = [];
-    n = len(findings.get("hidden_blocks") or []);
-    if n {
-        context.append(_plural(n, "hidden block", "hidden blocks"));
-    }
-    n = len(findings.get("hidden_urls") or []);
-    if n {
-        context.append(_plural(n, "hidden URL", "hidden URLs"));
-    }
-    removed: any = " and ".join(context);
-
+    alarms: list[str] = _phrases(
+        [
+            len(findings.get("instruction_like") or []),
+            int(findings.get("invisible_flagged") or 0),
+            int((findings.get("invisible_chars") or {}).get("tag") or 0),
+            len(findings.get("invisible_text") or []),
+            len(findings.get("homoglyph_runs") or []),
+        ],
+        ALARMS,
+    );
+    removed: str = " and ".join(
+        _phrases(
+            [len(findings.get("hidden_blocks") or []), len(findings.get("hidden_urls") or [])],
+            CONTEXT,
+        ),
+    );
     if alarms {
-        line: any = "posting_guard: ⚠ " + ", ".join(alarms) + " - review before continuing";
+        line: str = "posting_guard: ⚠ " + ", ".join(alarms) + " - review before continuing";
         return f"{line} ({removed} removed)" if removed else line;
     }
     if removed {
@@ -363,60 +268,45 @@ impl verdict(findings: builtins.dict) -> builtins.str {
     return "posting_guard: clean";
 }
 
-impl guard(raw: builtins.str, mode: builtins.str) -> any {
+impl guard(raw: str, mode: str) -> tuple[str, dict[str, any]] {
     if mode == "auto" {
         mode = "html" if HTML_HINT.search(raw) else "text";
     }
+    text: str = raw;
+    hidden: dict[str, any] = {"hidden_blocks": [], "hidden_text": ""};
     if mode == "html" {
-        text: any;
-        hf: any;
-        (text, hf) = clean_html(raw) as any;
-        hidden_text: any;
-        hidden_blocks: any;
-        (hidden_text, hidden_blocks) = (hf["hidden_text"], hf["hidden_blocks"]);
-    } else {
-        (text, hidden_text, hidden_blocks) = (raw, "", []);
+        (text, hidden) = clean_html(raw);
     }
-    tf: any;
-    (text, tf) = clean_text(text) as any;
-    hidden_tf: any;
-    (hidden_text, hidden_tf) = clean_text(hidden_text) as any;
+    (text, tf) = clean_text(text);
+    (hidden_text, hidden_tf) = clean_text(hidden["hidden_text"]);
     for (key, n) in hidden_tf["invisible_chars"].items() {
         tf["invisible_chars"][key] = tf["invisible_chars"].get(key, 0) + n;
     }
     tf["invisible_flagged"] += hidden_tf["invisible_flagged"];
     tf["invisible_text"] += hidden_tf["invisible_text"];
-    hidden_text = "\n".join([hidden_text, *tf["invisible_text"]]);
-    findings: any = {"hidden_blocks": hidden_blocks, **tf, **scan(text, hidden_text)};
-    verdict_line: any = verdict(findings);
-    if not text and verdict_line == "posting_guard: clean" {
-        findings["verdict"] = NO_TEXT_VERDICT;
-    } else {
-        findings["verdict"] = verdict_line;
-    }
+    findings: dict[str, any] = {
+        "hidden_blocks": hidden["hidden_blocks"],
+        **tf,
+        **scan(text, "\n".join([hidden_text, *tf["invisible_text"]])),
+    };
+    line: str = verdict(findings);
+    findings["verdict"] = NO_TEXT_VERDICT if not text and line == "posting_guard: clean" else line;
     return (text, findings);
 }
 
-impl _plain_findings(findings: builtins.dict) -> builtins.str {
-    lines: any = [];
-    for key in (
-        "hidden_blocks",
-        "instruction_like",
-        "invisible_text",
-        "hidden_urls",
-        "homoglyph_runs",
-    ) {
-        items: any = findings[key];
-        lines.append(f"{key} ({len(items)}):");
-        lines.extend(f"  - \"{item}\"" for item in items);
+impl _plain_findings(findings: dict[str, any]) -> str {
+    lines: list[str] = [];
+    for key in LISTED {
+        lines.append(f"{key} ({len(findings[key])}):");
+        lines.extend([f"  - \"{item}\"" for item in findings[key]]);
     }
-    lines.append(
-        "invisible_chars: "
-            + (", ".join(f"{k}={v}" for (k, v) in findings["invisible_chars"].items()) or "none"),
-    );
-    lines.append("invisible_flagged: " + format(findings["invisible_flagged"], ""));
-    lines.append("visible_url_count: " + format(findings["visible_url_count"], ""));
-    return "\n".join(lines);
+    chars: str = ", ".join([f"{k}={v}" for (k, v) in findings["invisible_chars"].items()]);
+    return "\n".join([
+        *lines,
+        f"invisible_chars: {chars or 'none'}",
+        f"invisible_flagged: {findings['invisible_flagged']}",
+        f"visible_url_count: {findings['visible_url_count']}",
+    ]);
 }
 
 impl _force_utf8_output -> None {
@@ -428,25 +318,18 @@ impl _force_utf8_output -> None {
     }
 }
 
-impl _read_input(path, mode) -> any {
-    if path is not None {
-        data: any = path.read_bytes();
-    } else {
-        buffer: any = getattr(sys.stdin, "buffer", None);
-        if buffer is None {
-            return sys.stdin.read();
-        }
-        data = buffer.read();
+impl _read_input(path: Path | None, mode: str) -> str {
+    buffer: any = getattr(sys.stdin, "buffer", None);
+    if path is None and buffer is None {
+        return sys.stdin.read();
     }
-    if mode == "html" {
-        return decode_page(data);
-    }
-    return data.decode("utf-8", errors="replace");
+    data: bytes = buffer.read() if path is None else path.read_bytes();
+    return decode_page(data) if mode == "html" else data.decode("utf-8", errors="replace");
 }
 
-impl main(argv=None) -> builtins.int {
+impl main(argv: list[str] | None = None) -> int {
     _force_utf8_output();
-    parser: any = argparse.ArgumentParser(
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
         prog="posting_guard.jac",
         description="Integrity gate for a fetched posting; see module docstring.",
     );
@@ -461,18 +344,15 @@ impl main(argv=None) -> builtins.int {
     );
     parser.add_argument("--json", action="store_true", help="print findings as JSON");
     parser.set_defaults(mode="auto");
-    args: any = parser.parse_args(argv);
-
+    args: argparse.Namespace = parser.parse_args(argv);
     try {
-        raw: any = _read_input(args.infile, args.mode);
+        raw: str = _read_input(args.infile, args.mode);
     } except OSError as exc {
         print(f"posting_guard: cannot read input: {exc}", file=sys.stderr);
         return 2;
     }
-
-    cleaned: any;
-    findings: any;
-    (cleaned, findings) = guard(raw, args.mode) as any;
+    (cleaned, findings) = guard(raw, args.mode);
+    refused: bool = findings["verdict"] == NO_TEXT_VERDICT;
     print(findings["verdict"]);
     print("--- findings ---");
     print(
@@ -480,22 +360,19 @@ impl main(argv=None) -> builtins.int {
             if args.json
             else _plain_findings(findings),
     );
-    if args.out is not None {
-        if _inside_repo(args.out) {
-            print(
-                f"posting_guard: refusing to write inside the repo ({args.out}); the cleaned posting is untrusted text and belongs in the session scratchpad",
-                file=sys.stderr,
-            );
-            return 2;
-        }
-        if findings["verdict"] != NO_TEXT_VERDICT {
-            args.out.parent.mkdir(parents=True, exist_ok=True);
-            args.out.write_text(cleaned + "\n", encoding="utf-8");
-            print(f"saved={args.out}");
-        }
-    } else {
+    if args.out is None {
         print("--- text ---");
         print(cleaned);
+    } elif _inside_repo(args.out) {
+        print(
+            f"posting_guard: refusing to write inside the repo ({args.out}); the cleaned posting is untrusted text and belongs in the session scratchpad",
+            file=sys.stderr,
+        );
+        return 2;
+    } elif not refused {
+        args.out.parent.mkdir(parents=True, exist_ok=True);
+        args.out.write_text(cleaned + "\n", encoding="utf-8");
+        print(f"saved={args.out}");
     }
-    return 1 if findings["verdict"] == NO_TEXT_VERDICT else 0;
+    return 1 if refused else 0;
 }
