@@ -25,7 +25,7 @@ salary_data.json
 # its own directory, so these land at .claude/skills/job-scraper/job_scraper/*.
 # A rooted `job_scraper/...` pattern silently fails to match them.
 **/job_scraper/seen_jobs.json
-# Backups written by `tools/job_key.py --audit --migrate` hold the same history.
+# Backups written by `tools/job_key.jac --audit --migrate` hold the same history.
 **/job_scraper/seen_jobs.json.bak-*
 **/job_scraper/notion_sync.json
 **/job_scraper/*.md
@@ -85,7 +85,7 @@ documents/applications/**
 documents/postings/**
 # Belt-and-braces, not the primary guard: nothing writes here. Prep packs land
 # in documents/applications/<company>_<role>/, covered above. Kept because
-# tools/security_guards.py pins it in REQUIRED_IGNORE_RULES.
+# tools/security_guards.jac pins it in REQUIRED_IGNORE_RULES.
 documents/interview/**
 !documents/**/.gitkeep
 
@@ -121,3 +121,7 @@ company_research/*.json
 
 # Brainstorm mockups (superpowers visual companion) - never ship
 .superpowers/
+
+# What neojac writes: build records and the Python environment and built apps.
+.jac/
+dist/

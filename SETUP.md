@@ -14,15 +14,17 @@ npm install -g @anthropic-ai/claude-code
 
 You'll need an Anthropic API key or a Claude Pro/Team subscription. See the [Claude Code docs](https://docs.anthropic.com/en/docs/claude-code) for details.
 
-### Python
+### neojac
 
-Python 3.10+ is required for the salary lookup tool. Check with:
+The tools in `tools/` and `salary_lookup.jac` are written in Jac and run through [neojac](https://github.com/jaseci-labs/neojac), which ships its own CPython. Install it, then fetch the tools' packages once from the repository root:
 
 ```bash
-python3 --version
+curl -fsSL https://github.com/jaseci-labs/neojac/releases/latest/download/install.sh | bash
+neojac --version
+neojac install
 ```
 
-On Windows, `py --version` is often the most reliable check. If your system exposes Python as `python` instead of `python3`, use `python` in the commands below.
+Every tool is then `neojac run jobsearch -- <tool> [arguments]`, run from the repository root; the first run builds the app. neojac installs on Linux (x86_64, arm64) and macOS (Apple Silicon).
 
 ### Bun (for job search tools)
 
@@ -161,7 +163,7 @@ Push-Location $SmokeDir; xelatex -interaction=nonstopmode -halt-on-error cover_s
 
 `/apply` runs an ATS parseability check on the compiled CV: it extracts the PDF's text layer and verifies contact details, reading order, and keyword coverage the way an applicant-tracking system sees them.
 
-The default extractor is **pypdf** (BSD, `pip install pypdf`). Poppler `pdftotext` remains an optional fallback:
+The default extractor is **pypdf** (BSD), which `neojac install` fetches with the tools' other packages. Poppler `pdftotext` remains an optional fallback:
 
 - **macOS:** `brew install poppler`
 - **Debian/Ubuntu:** `sudo apt install poppler-utils`
@@ -198,12 +200,12 @@ Or manually: fork on GitHub, then clone your fork.
 ## 3. Add job portals and install their CLI dependencies
 AI Job Search ships no job-board CLIs. Portal skills live in [community-portals](https://github.com/ai-job-search-dev/community-portals), one folder per board under `portals/<country>/` (LinkedIn and multi-market boards under `portals/global/`). For each board you want, ask your agent, swapping in its folder:
 
-> Copy https://github.com/ai-job-search-dev/community-portals/tree/main/portals/dk/jobindex-search into `.agents/skills/` and show me its code and what it does. Once I confirm, run `python3 tools/install_portal_clis.py` (Windows: `python tools\install_portal_clis.py`).
+> Copy https://github.com/ai-job-search-dev/community-portals/tree/main/portals/dk/jobindex-search into `.agents/skills/` and show me its code and what it does. Once I confirm, run `neojac run jobsearch -- install_portal_clis` (Windows: `python tools\install_portal_clis.jac`).
 
 `/setup` prints this prompt for the boards you name. To reinstall later, run from the repository root:
 
 ```bash
-python3 tools/install_portal_clis.py   # Windows: python tools\install_portal_clis.py
+neojac run jobsearch -- install_portal_clis
 ```
 
 It runs `bun install` in every portal CLI under `.agents/skills/*/cli/` - discovered, not listed, so a portal you copy from community-portals or add with `/add-portal` is included on a fresh clone. With no portal installed it does nothing. Every install runs with `--ignore-scripts`, and a CLI whose `package.json` declares an install-time lifecycle script, `trustedDependencies` or `workspaces`, or that has a `bunfig.toml` or `.npmrc` beside it, is skipped and reported rather than run. `--dry-run` shows what it would install.
@@ -266,8 +268,7 @@ If you have salary data (from a union, salary survey, Glassdoor, or personal res
 1. **Option A:** Create `salary_data.json` manually in the repo root (see `tools/README_SALARY_TOOL.md` for the format)
 2. **Option B:** Convert from Excel:
    ```bash
-   pip install openpyxl
-   python3 tools/convert_salary_excel.py path/to/salary-data.xlsx --source "My Salary Data 2025"
+   neojac run jobsearch -- convert_salary_excel path/to/salary-data.xlsx --source "My Salary Data 2025"
    ```
 
 This creates `salary_data.json` which the `/apply` workflow uses for salary benchmarking. If you skip this step, salary lookup is simply omitted.
@@ -330,24 +331,24 @@ Upstream keeps improving the methodology files your fork has personalized, so pl
    ```bash
    git remote add upstream https://github.com/ai-job-search-dev/ai-job-search.git   # first time only, if you cloned your own fork
    git fetch upstream    # or origin, if you cloned the template directly
-   python3 tools/check_upstream_updates.py
+   neojac run jobsearch -- check_upstream_updates
    ```
    It compares the `framework_version` markers in your framework files against upstream and lists exactly which methodology files changed, with the diff command for each.
 
    Two tools answer two different questions, and it's worth running both:
-   - **`check_upstream_updates.py`** — *which of my personalized files changed?* It reads the `framework_version` stamp on each methodology file, so it flags exactly the customized files a release touched.
-   - **`upstream_triage.py`** — *which upstream commits deserve my attention?* It walks the commits you're behind and sorts them into "worth reviewing" vs "probably skip", dropping anything you've already cherry-picked (matched by `git patch-id`, so ported work falls off with no bookkeeping), commits that only touch files your fork removed, and SHAs you've listed in `.github/upstream-wontport.txt`. It's report-only — it prints ready-to-run `git cherry-pick` lines but never merges, pushes, or opens a PR, because on a fork "applies cleanly" isn't "correct".
+   - **`check_upstream_updates.jac`** — *which of my personalized files changed?* It reads the `framework_version` stamp on each methodology file, so it flags exactly the customized files a release touched.
+   - **`upstream_triage.jac`** — *which upstream commits deserve my attention?* It walks the commits you're behind and sorts them into "worth reviewing" vs "probably skip", dropping anything you've already cherry-picked (matched by `git patch-id`, so ported work falls off with no bookkeeping), commits that only touch files your fork removed, and SHAs you've listed in `.github/upstream-wontport.txt`. It's report-only — it prints ready-to-run `git cherry-pick` lines but never merges, pushes, or opens a PR, because on a fork "applies cleanly" isn't "correct".
 
      ```bash
-     python3 tools/upstream_triage.py --remote upstream
+     neojac run jobsearch -- upstream_triage --remote upstream
      ```
 
      Forks also inherit a `.github/workflows/upstream-watch.yml` that runs this weekly and writes the result into a single rolling issue (it no-ops on the upstream template itself, and stays disabled on a fork until you enable Actions).
 3. **Merge normally.** `git merge upstream/master` (or `git pull`) three-way-merges upstream's edits around your personalization; because methodology edits rarely touch the lines `/setup` filled in, most updates land cleanly. A conflict in a personalized file is a *feature*, not a failure — it means upstream changed methodology in a section you customized, and the version marker plus its changelog commit tell you why. Resolve by keeping your data and adopting the methodology change around it.
 
-### Tracking your own directory without editing `security_guards.py`
+### Tracking your own directory without editing `security_guards.jac`
 
-If your fork keeps a tracked placeholder under a personal-data ignore rule (for example a `leads/` folder with a `.gitkeep`), `tools/security_guards.py` rejects the `!leads/.gitkeep` negation because it is not in `ALLOWED_IGNORE_NEGATIONS`. Editing that set works, but every upstream change near it then conflicts on merge. Instead, list the negation in `.github/security-guards-local.txt`:
+If your fork keeps a tracked placeholder under a personal-data ignore rule (for example a `leads/` folder with a `.gitkeep`), `tools/security_guards.jac` rejects the `!leads/.gitkeep` negation because it is not in `ALLOWED_IGNORE_NEGATIONS`. Editing that set works, but every upstream change near it then conflicts on merge. Instead, list the negation in `.github/security-guards-local.txt`:
 
 ```text
 # fork-only tracked placeholders
@@ -362,7 +363,7 @@ One negation per line; blank lines and `#` comments are ignored. The file can on
 This is expected if you haven't set up salary benchmarking. The `/apply` workflow skips this step automatically.
 
 ### Job search CLI tools not working
-Make sure Bun is installed and you ran `python3 tools/install_portal_clis.py` after copying the portal into `.agents/skills/`. The tools require network access to fetch job listings.
+Make sure Bun is installed and you ran `neojac run jobsearch -- install_portal_clis` after copying the portal into `.agents/skills/`. The tools require network access to fetch job listings.
 
 ### LaTeX compilation errors
 - CV: uses `lualatex` (pdflatex often fails on modern MiKTeX with `fontawesome5` font-expansion errors; lualatex handles the same sources cleanly)
@@ -373,7 +374,7 @@ Make sure Bun is installed and you ran `python3 tools/install_portal_clis.py` af
 The cover letter template expects fonts in `cover_letters/OpenFonts/fonts/`. Make sure this directory exists and contains the Lato and Raleway font files.
 
 ### Stale `.claude/settings.local.json` from an older clone
-Shared Claude Code permissions now live in `.claude/settings.json`: an `allow` list scoped to the exact commands the workflow runs (the `tools/` scripts and `salary_lookup.py`; a portal CLI you copy in is pre-approved only inside its own skill, so `/scrape`, `/apply` and `/rank` prompt for it until you add its entry here by path, as `/add-portal` describes), an `ask` list that always prompts before the permission-defining files are edited or `git push` runs, and a `deny` list that blocks upload-shaped shell and reads of credential files in every mode. `SECURITY.md` has the full table. Earlier versions of this repo committed a broader `.claude/settings.local.json` that pre-approved `Bash(curl:*)`, `Bash(python:*)` and `Bash(bun:*)`. If you cloned before that change, git leaves the old file behind in your working copy, and its permissions still apply on top of `settings.json`. Delete it (or trim it to your own personal overrides):
+Shared Claude Code permissions now live in `.claude/settings.json`: an `allow` list scoped to the exact commands the workflow runs (the `tools/` scripts and `salary_lookup.jac`; a portal CLI you copy in is pre-approved only inside its own skill, so `/scrape`, `/apply` and `/rank` prompt for it until you add its entry here by path, as `/add-portal` describes), an `ask` list that always prompts before the permission-defining files are edited or `git push` runs, and a `deny` list that blocks upload-shaped shell and reads of credential files in every mode. `SECURITY.md` has the full table. Earlier versions of this repo committed a broader `.claude/settings.local.json` that pre-approved `Bash(curl:*)`, `Bash(python:*)` and `Bash(bun:*)`. If you cloned before that change, git leaves the old file behind in your working copy, and its permissions still apply on top of `settings.json`. Delete it (or trim it to your own personal overrides):
 
 ```bash
 rm .claude/settings.local.json

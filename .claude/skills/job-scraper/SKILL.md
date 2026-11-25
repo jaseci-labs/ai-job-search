@@ -5,7 +5,7 @@ description: >
   in .agents/skills/ (copied from community-portals or built with /add-portal), with
   WebSearch as the fallback. Deduplicates across runs. Triggers on: job scrape, find jobs, search jobs, new jobs, job search,
   scrape jobs, /scrape
-allowed-tools: Read, Write, Edit, Glob, Grep, Bash(bun --version), Bash(python tools/job_key.py:*), Bash(python3 tools/job_key.py:*), Bash(python tools/scrape_state.py:*), Bash(python3 tools/scrape_state.py:*), WebFetch, WebSearch, Agent, AskUserQuestion
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash(bun --version), Bash(neojac run jobsearch -- job_key:*), Bash(neojac run jobsearch -- scrape_state:*), WebFetch, WebSearch, Agent, AskUserQuestion
 ---
 
 # Job Scraper
@@ -43,9 +43,7 @@ Optional arguments:
 
 ### Step 0: Load Search Strategy
 
-Read `search-queries.md` (this directory) for the search strategy. `tools/scrape_state.py` reads `job_scraper/seen_jobs.json` and `job_search_tracker.csv` for deduplication; do not load either growing file into the conversation.
-
-> **Windows:** run these tools as `python`, not `python3`. A python.org install ships no `python3`, so that name reaches the Microsoft Store alias, which either exits 49 with no output (#669) or starts a separate Store Python without the packages `pip` installed (such as pypdf). `.claude/settings.json` allows both spellings.
+Read `search-queries.md` (this directory) for the search strategy. `tools/scrape_state.jac` reads `job_scraper/seen_jobs.json` and `job_search_tracker.csv` for deduplication; do not load either growing file into the conversation.
 
 ### Step 1: Search
 
@@ -100,7 +98,7 @@ Tag each fallback result as WebSearch-sourced, keeping the portal tag when the f
 Before detail fetches, combine the promising search hits into a JSON array in a temporary file outside the repo. Include each hit's source portal and `source` (`cli` or `websearch`), then run:
 
 ```bash
-python3 tools/scrape_state.py candidates --results "<temporary search results.json>"
+neojac run jobsearch -- scrape_state candidates --results "<temporary search results.json>"
 ```
 
 Only fetch details for the returned `selected` hits. The helper checks prior URLs (including legacy-key entries), company+title pairs, the application tracker, and duplicates within this run. This avoids repeat detail requests on every scrape. If `invalid` lists malformed hits, report them as portal data errors and continue with the valid hits; never invent a missing company or URL. Keep the returned hits for Step 4; never paste the history file into the agent context.
@@ -123,7 +121,7 @@ ghost report self-triaging. `isActive: true` is only the absence of that banner,
 proof the posting is open; deadlines and dead URLs remain `/rank`'s job.
 
 **From WebSearch results:** Use `WebFetch` on the posting URL and extract the same
-fields manually. If it returns HTTP 403, retry with browser headers via `python3 tools/fetch_page.py` per
+fields manually. If it returns HTTP 403, retry with browser headers via `neojac run jobsearch -- fetch_page` per
 `.claude/skills/job-application-assistant/09-web-research.md` before giving up — most
 bank and corporate sites reject WebFetch's user agent while serving browsers normally.
 
@@ -161,19 +159,19 @@ For each new job, do a rapid fit check (NOT the full evaluation from `04-job-eva
 
 ### Step 4: Deduplicate & Store
 
-1. Keep the canonical key rule; `scrape_state.py store` calls `tools/job_key.py`'s `make_key` for every inserted entry, so a separate key subprocess per job is unnecessary:
+1. Keep the canonical key rule; `scrape_state.jac store` calls `tools/job_key.jac`'s `make_key` for every inserted entry, so a separate key subprocess per job is unnecessary:
 
 ```bash
-python3 tools/job_key.py --company "<company>" --title "<title>" --url "<url>"
+neojac run jobsearch -- job_key --company "<company>" --title "<title>" --url "<url>"
 ```
 
-It prints one line: the canonical key for that posting. The key must be a pure function of the posting, because two runs that slugify differently store the same job twice and defeat the dedup this step exists to provide. The helper also length-caps long titles and disambiguates the cap with a hash of the full slug, so a truncated title is stable across runs and two different long titles never collide. `python3 tools/job_key.py --audit` reports entries in an existing state file that predate this rule; it only reports. `python3 tools/job_key.py --audit --migrate` rewrites the keys that no longer match the rule (backup first, old->new reported, an existing key is never overwritten, a second run changes nothing).
+It prints one line: the canonical key for that posting. The key must be a pure function of the posting, because two runs that slugify differently store the same job twice and defeat the dedup this step exists to provide. The helper also length-caps long titles and disambiguates the cap with a hash of the full slug, so a truncated title is stable across runs and two different long titles never collide. `neojac run jobsearch -- job_key --audit` reports entries in an existing state file that predate this rule; it only reports. `neojac run jobsearch -- job_key --audit --migrate` rewrites the keys that no longer match the rule (backup first, old->new reported, an existing key is never overwritten, a second run changes nothing).
 
 2. Add ALL fetched jobs (new and skipped) to `job_scraper/seen_jobs.json` through the tool below. Each stored entry has this structure:
 ```json
 {
   "seen": {
-    "<key from tools/job_key.py>": {
+    "<key from tools/job_key.jac>": {
       "title": "...",
       "company": "...",
       "url": "...",
@@ -193,7 +191,7 @@ It prints one line: the canonical key for that posting. The key must be a pure f
 Pass each entry object (without the outer `seen` map or key) to the tool; include the search hit's `location` and any other fetched fields already used by the workflow. Then run:
 
 ```bash
-python3 tools/scrape_state.py store --results "<temporary fetched jobs.json>"
+neojac run jobsearch -- scrape_state store --results "<temporary fetched jobs.json>"
 ```
 
 The tool rechecks deduplication against the current state and tracker, computes keys, and atomically adds only new entries to `job_scraper/seen_jobs.json`. Use its `added` keys to present only newly stored jobs. It leaves every older entry and its `/rank` fields untouched. Do not read or rewrite the full state file in the conversation.
@@ -244,7 +242,7 @@ Scraper-based portal CLIs rot silently: when a portal changes its markup, the pa
 **Free pass (no extra requests).** For each enabled portal that ran in Step 1b:
 
 - **Degraded scan:** inspect the results it returned this run. Flags: `company` null or empty on every result, empty titles, undecoded entities (`&amp;`) or HTML fragments in titles, URLs that do not point at the portal. Any of these means the parser is half-working and `/scrape` is silently collecting junk.
-- **Yield history:** if the portal returned zero results across all of this run's queries, run `python3 tools/scrape_state.py history --portal <skill-name> --domain <portal-host>` (the host from that portal's documented base URL). It counts prior `job_scraper/seen_jobs.json` entries by `portal`, or by URL host for entries predating that field, without loading the history into context. A portal that produced jobs on earlier runs and produces nothing now is suspect - the same queries worked before.
+- **Yield history:** if the portal returned zero results across all of this run's queries, run `neojac run jobsearch -- scrape_state history --portal <skill-name> --domain <portal-host>` (the host from that portal's documented base URL). It counts prior `job_scraper/seen_jobs.json` entries by `portal`, or by URL host for entries predating that field, without loading the history into context. A portal that produced jobs on earlier runs and produces nothing now is suspect - the same queries worked before.
 
 **Escalation (bounded, on suspicion only).** A suspect portal gets **one** sentinel probe: run its documented `search` with the example query from its own SKILL.md (that query provably worked when the skill was registered), the portal's limit flag capped at 3, `--format json`. If that returns nothing, retry **once** with a single common word. Only then is the verdict **broken**. A 429 or block page is **never** evidence of breakage - record the portal as **inconclusive (rate-limited)**, back off, and do not retry.
 

@@ -81,10 +81,9 @@ The framework encodes career guidance best practices, including structured evalu
 | | |
 |---|---|
 | **[Claude Code](https://claude.com/claude-code)** | The CLI. No free tier: a Claude Pro/Max/Team subscription or Anthropic API credits (pay-per-token, usually cheaper for occasional use). |
-| **Python 3.10+** | For the tools in `tools/`. |
+| **[neojac](https://github.com/jaseci-labs/neojac)** | Builds and runs the Jac tools in `tools/` (`neojac install` once, then `neojac run jobsearch -- <tool>`). Linux and macOS (Apple Silicon). |
 | **[Bun](https://bun.sh)** | Runs the job portal CLI tools you copy in from community-portals. |
 | **LaTeX** | A minimal install with `lualatex` and `xelatex`: [TinyTeX](https://yihui.org/tinytex/) on macOS/Linux or [Basic MiKTeX](https://miktex.org/) on Windows, plus the packages in [SETUP.md](SETUP.md#latex-for-compiling-cvs-and-cover-letters). A full TeX Live, MacTeX or MiKTeX also works. |
-| **pypdf** *(optional)* | `pip install pypdf` for `/apply`'s ATS parseability check. |
 
 <details>
 <summary>Fine print: other agents, LaTeX engines, PDF text extraction</summary>
@@ -125,7 +124,7 @@ cd ai-job-search
 
 AI Job Search ships no job-board CLIs; without one, `/scrape` searches with WebSearch. Pick your boards in [community-portals](https://github.com/ai-job-search-dev/community-portals) (`portals/<country>/`, or `portals/global/` for LinkedIn and multi-market boards), and ask your agent, swapping in your board's folder:
 
-> Copy https://github.com/ai-job-search-dev/community-portals/tree/main/portals/dk/jobindex-search into `.agents/skills/` and show me its code and what it does. Once I confirm, run `python3 tools/install_portal_clis.py` (Windows: `python tools\install_portal_clis.py`).
+> Copy https://github.com/ai-job-search-dev/community-portals/tree/main/portals/dk/jobindex-search into `.agents/skills/` and show me its code and what it does. Once I confirm, run `neojac run jobsearch -- install_portal_clis` (Windows: `python tools\install_portal_clis.jac`).
 
 `/setup` prints this prompt for the boards you name.
 
@@ -204,7 +203,7 @@ This runs the full workflow: evaluate fit, draft CV + cover letter, review with 
 - **`/rank`** bridges `/scrape` and `/apply`: it batch-scores all newly scraped postings against the fit framework (parallel agents fetch each posting and score the five evaluation dimensions) and returns a ranked shortlist with honest per-job strengths and gaps. Deal-breakers veto, deadlines get urgency flags, dead postings get marked expired. Pick a number and it hands off to the full `/apply` workflow.
 - **`/expand`** enriches your profile by scanning public sources you've already linked in it (GitHub repos, portfolio site, Kaggle, Google Scholar) and looking up syllabi for named courses and certifications. Discovered competencies are added to your profile with a source tag. Useful right after `/setup` to surface skills that documents alone don't make explicit.
 - **`/upskill`** analyzes the gap between your profile, your tracked job postings, and your ranked-but-untracked postings (`/rank`'s recorded gaps in `job_scraper/seen_jobs.json`) — or a single posting via `/upskill <URL>`. Produces a prioritized heatmap of skill gaps and a learning plan with web-searched study resources and time estimates. Useful for career planning between applications.
-- **`/html-report`** runs `tools/html_report.py` to generate a self-contained HTML dashboard from `job_search_tracker.csv` and the application archives: a KPI strip, funnel, status, applications-over-time, stage, sector and channel charts (inline SVG and CSS), a follow-up table and a sortable, filterable applications table, with system fonts and light and dark themes. Opens directly in a browser, fully offline. Re-run it any time after `/apply` or `/outcome` adds new entries.
+- **`/html-report`** runs `tools/html_report.jac` to generate a self-contained HTML dashboard from `job_search_tracker.csv` and the application archives: a KPI strip, funnel, status, applications-over-time, stage, sector and channel charts (inline SVG and CSS), a follow-up table and a sortable, filterable applications table, with system fonts and light and dark themes. Opens directly in a browser, fully offline. Re-run it any time after `/apply` or `/outcome` adds new entries.
 - **`/add-template`** registers your own CV or cover letter template (LaTeX, Typst, or another toolchain) in place of the stock ones. It captures the template's instructions (source extension, compile command, fonts, style rules, page limit), runs a mandatory test compile, and wires the template into `/apply`. See [Custom templates](#custom-templates) below.
 - **`/add-portal`** generates a job-portal search skill for a job board in your market. It investigates the portal (search URL pattern, result structure, access rules), scaffolds the CLI skill from the same structure as the community portals, and test-runs a live query before registering. See [Job search tools](#job-search-tools) below.
 
@@ -325,7 +324,7 @@ Market-specific *data sources* (a national salary database, local award-rate tab
 
 The salary tool works with any salary data you provide (union statistics, Glassdoor exports, personal research, etc.). See `tools/README_SALARY_TOOL.md` for the expected format and setup. If you don't have salary data, the salary step is simply skipped.
 
-`tools/convert_salary_excel.py` turns an Excel export into that format. When the company column also holds the city, as in the IDA workbook's "Firmanavn og by" column (`Ørsted A/S,Fredericia`), the converter splits each cell on its last comma and strips both parts, so `salary_lookup.py --city` can filter. A company name that itself contains ", " stays intact.
+`tools/convert_salary_excel.jac` turns an Excel export into that format. When the company column also holds the city, as in the IDA workbook's "Firmanavn og by" column (`Ørsted A/S,Fredericia`), the converter splits each cell on its last comma and strips both parts, so `salary_lookup.jac --city` can filter. A company name that itself contains ", " stays intact.
 
 ### Starting over
 
@@ -341,7 +340,7 @@ To wipe your profile data and start fresh:
 
 ### Staying up to date
 
-Upstream moves fast. Rather than pulling raw `master` and hoping, update your fork to a tagged [release](../../releases) - a weekly checkpoint that passed CI, with its changes listed on the release page. `python3 tools/check_upstream_updates.py` previews exactly which of your personalized files an update touches before you merge, and `python3 tools/upstream_triage.py` sorts the commits you're behind into "worth reviewing" vs "probably skip" (a weekly workflow can post this to a rolling issue). Full walkthrough in [SETUP.md, section 8](SETUP.md#8-pulling-upstream-updates-into-your-fork).
+Upstream moves fast. Rather than pulling raw `master` and hoping, update your fork to a tagged [release](../../releases) - a weekly checkpoint that passed CI, with its changes listed on the release page. `neojac run jobsearch -- check_upstream_updates` previews exactly which of your personalized files an update touches before you merge, and `neojac run jobsearch -- upstream_triage` sorts the commits you're behind into "worth reviewing" vs "probably skip" (a weekly workflow can post this to a rolling issue). Full walkthrough in [SETUP.md, section 8](SETUP.md#8-pulling-upstream-updates-into-your-fork).
 
 ## Tips for better results
 
@@ -417,24 +416,24 @@ ai-job-search/
 ├── .github/workflows/ci.yml           # CI: LaTeX smoke compiles, skill lint, CLI typechecks
 ├── .github/workflows/release.yml      # Weekly SemVer release from merged PR titles (skipped on forks)
 ├── .github/workflows/upstream-watch.yml  # Weekly upstream triage into a rolling issue (reports only)
-├── salary_lookup.py                   # Salary benchmarking tool (BYO data)
+├── salary_lookup.jac                   # Salary benchmarking tool (BYO data)
 ├── tools/
-│   ├── check_framework_version.py     # CI check: framework_version bumped when skill files change
-│   ├── check_upstream_updates.py      # Preview which personalized files an upstream update touches
-│   ├── convert_salary_excel.py        # Convert salary Excel to JSON
-│   ├── fetch_page.py                  # GET-only browser-header retry for 403s (robots.txt enforced)
-│   ├── install_portal_clis.py         # Install every discovered portal CLI (bun install)
-│   ├── job_key.py                     # Canonical job key (company + title slug) shared by /scrape and /rank
-│   ├── lint_skills.py                 # CI lint for skills, commands, settings.json
-│   ├── page_decode.py                 # Decode a saved page by its declared charset (EUC-KR, Shift_JIS, ...)
-│   ├── posting_guard.py               # Integrity gate: strip hidden text, flag injection-shaped lines
-│   ├── rank_state.py                  # /rank state: candidates, deadline sweep, apply scores to seen_jobs.json
-│   ├── robots_check.py                # Gate the browser-header retry against robots.txt
-│   ├── scrape_state.py                # /scrape state: candidates, store, history over seen_jobs.json
-│   ├── security_guards.py             # CI guards: permission allow/ask/deny, skill grants, gitignore, manifests
-│   ├── upstream_triage.py             # Sort upstream commits into worth-reviewing vs probably-skip
-│   ├── verify_layout.py               # Measure a compiled PDF's page layout (holes, orphans, footer collisions)
-│   ├── verify_pdf.py                  # Verify a compiled PDF's page count and extractable text
+│   ├── check_framework_version.jac     # CI check: framework_version bumped when skill files change
+│   ├── check_upstream_updates.jac      # Preview which personalized files an upstream update touches
+│   ├── convert_salary_excel.jac        # Convert salary Excel to JSON
+│   ├── fetch_page.jac                  # GET-only browser-header retry for 403s (robots.txt enforced)
+│   ├── install_portal_clis.jac         # Install every discovered portal CLI (bun install)
+│   ├── job_key.jac                     # Canonical job key (company + title slug) shared by /scrape and /rank
+│   ├── lint_skills.jac                 # CI lint for skills, commands, settings.json
+│   ├── page_decode.jac                 # Decode a saved page by its declared charset (EUC-KR, Shift_JIS, ...)
+│   ├── posting_guard.jac               # Integrity gate: strip hidden text, flag injection-shaped lines
+│   ├── rank_state.jac                  # /rank state: candidates, deadline sweep, apply scores to seen_jobs.json
+│   ├── robots_check.jac                # Gate the browser-header retry against robots.txt
+│   ├── scrape_state.jac                # /scrape state: candidates, store, history over seen_jobs.json
+│   ├── security_guards.jac             # CI guards: permission allow/ask/deny, skill grants, gitignore, manifests
+│   ├── upstream_triage.jac             # Sort upstream commits into worth-reviewing vs probably-skip
+│   ├── verify_layout.jac               # Measure a compiled PDF's page layout (holes, orphans, footer collisions)
+│   ├── verify_pdf.jac                  # Verify a compiled PDF's page count and extractable text
 │   └── README_SALARY_TOOL.md          # Salary tool setup instructions
 ├── job_scraper/                       # Scraper state (seen jobs, results)
 ├── gmail_sync/                        # /gmail-sync state (processed message IDs, last sync date)

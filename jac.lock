@@ -1,0 +1,7 @@
+# Written by neojac: what each ecosystem's own resolver pinned for jac.toml.
+# `neojac install --frozen` installs exactly this.
+version = 2
+
+[pypi]
+resolved = ["et_xmlfile==2.0.0", "openpyxl==3.1.5", "pypdf==7.1.1", "PyYAML==6.0.4"]
+inputs = "5b7067d3fe5a7fbabf7298f359748a2380ebae421099cd2381291458345e9bf8"

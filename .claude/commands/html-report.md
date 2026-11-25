@@ -2,7 +2,7 @@
 
 Generate a self-contained HTML dashboard from `job_search_tracker.csv` and the application archives under `documents/applications/`. The output is a single `.html` file that opens directly in a browser: system fonts, light and dark themes, CSS and SVG charts, no network requests.
 
-The work is done by two scripts: `tools/report_data.py` computes every figure and `tools/html_report.py` renders it. Steps 1 and 2 document the rules `report_data.py` implements; do not recompute them in the conversation or edit the generated HTML by hand.
+The work is done by two scripts: `tools/report_data.jac` computes every figure and `tools/html_report.jac` renders it. Steps 1 and 2 document the rules `report_data.jac` implements; do not recompute them in the conversation or edit the generated HTML by hand.
 
 ## Step 0: Parse Arguments
 
@@ -50,10 +50,8 @@ Status normalisation — tracker values map to six canonical buckets before stat
 
 ## Step 3: Generate the HTML
 
-> **Windows:** run these tools as `python`, not `python3`.
-
 ```bash
-python3 tools/html_report.py [--out <path>]
+neojac run jobsearch -- html_report [--out <path>]
 ```
 
 The page contains a KPI strip, the funnel, a status mix bar, applications over time, where closed applications stopped, sector and channel bars, a "waiting longest for a reply" table, and a sortable, filterable applications table. Every tracker value is HTML-escaped; source links render only for `http(s)` URLs.

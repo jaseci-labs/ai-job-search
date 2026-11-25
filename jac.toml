@@ -1,0 +1,7 @@
+[project]
+name = "ai-job-search"
+
+[dependencies.pypi]
+pypdf = "~=7.1"
+openpyxl = "==3.1.5"
+pyyaml = "~=6.0"
