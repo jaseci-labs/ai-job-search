@@ -1,10 +1,7 @@
-impl ExactRankRoundingCLI.apply(cases) -> any {
-    directory: any;
+impl ExactRankRoundingCLI.test_half_points_round_up_into_the_right_verdict_band {
     with TemporaryDirectory() as directory {
-        `root: any = Path(directory);
-        state: any;
-        results: any;
-        (state, results) = (`root / "seen_jobs.json", `root / "scores.json");
+        state: Path = Path(directory) / "seen_jobs.json";
+        results: Path = Path(directory) / "scores.json";
         state.write_text(
             json.dumps({
                 "seen": {
@@ -15,7 +12,7 @@ impl ExactRankRoundingCLI.apply(cases) -> any {
                         "url": f"https://example.com/jobs/{key}",
                         "deadline": None,
                     }
-                    for key in cases
+                    for key in CASES
                 },
             }),
             encoding="utf-8",
@@ -25,23 +22,23 @@ impl ExactRankRoundingCLI.apply(cases) -> any {
                 {
                     "key": key,
                     "status": "scored",
-                    "scores": `dict(zip(DIMENSIONS, values)),
+                    "scores": dict(zip(DIMENSIONS, values)),
                     "location_verdict": "PASS",
                     "language_gate": "PASS",
                     "deadline": None,
                 }
-                for (key, values) in cases.items()
+                for (key, (values, _, _)) in CASES.items()
             ]),
             encoding="utf-8",
         );
-        result: any = subprocess.run(
+        proc: any = subprocess.run(
             [
                 *TOOL,
                 "apply",
                 "--state",
-                `str(state),
+                str(state),
                 "--results",
-                `str(results),
+                str(results),
                 "--today",
                 "2026-10-16",
             ],
@@ -49,41 +46,20 @@ impl ExactRankRoundingCLI.apply(cases) -> any {
             text=True,
             encoding="utf-8",
         );
-        self.assertEqual(result.returncode, 0, result.stderr);
-        output: any = json.loads(result.stdout);
-        stored: any = json.loads(state.read_text(encoding="utf-8"))["seen"];
+        self.assertEqual(proc.returncode, 0, proc.stderr);
+        output: dict[str, any] = json.loads(proc.stdout);
+        stored: dict[str, any] = json.loads(state.read_text(encoding="utf-8"))["seen"];
+        expected: dict[str, tuple[int, str]] = {
+            key: (score, verdict)
+            for (key, (_, score, verdict)) in CASES.items()
+        };
         self.assertEqual(output["errors"], []);
-        actual: any = {row["key"]: (row["score"], row["verdict"]) for row in output["ranked"]};
         self.assertEqual(
-            actual,
-            {key: (value["rank_score"], value["rank_verdict"]) for (key, value) in stored.items()},
+            {row["key"]: (row["score"], row["verdict"]) for row in output["ranked"]}, expected
         );
-        return actual;
+        self.assertEqual(
+            {key: (job["rank_score"], job["rank_verdict"]) for (key, job) in stored.items()},
+            expected,
+        );
     }
-}
-
-impl ExactRankRoundingCLI.test_halfpoint_boundaries_do_not_drop_a_verdict_band -> any {
-    self.assertEqual(
-        self.apply({"good": (31, 55, 51, 96), "weak": (31, 31, 57, 13)}),
-        {"good": (60, "Good Fit"), "weak": (30, "Weak Fit")},
-    );
-}
-
-impl ExactRankRoundingCLI.test_fractional_and_endpoint_controls -> any {
-    self.assertEqual(
-        self.apply({
-            "below": (31, 55, 51, 95.9),
-            "above": (31, 55, 51, 96.1),
-            "fractional": (72.5, 72.5, 72.5, 72.5),
-            "zero": (0, 0, 0, 0),
-            "hundred": (100, 100, 100, 100),
-        }),
-        {
-            "below": (59, "Moderate Fit"),
-            "above": (60, "Good Fit"),
-            "fractional": (73, "Good Fit"),
-            "zero": (0, "Poor Fit"),
-            "hundred": (100, "Strong Fit"),
-        },
-    );
 }
