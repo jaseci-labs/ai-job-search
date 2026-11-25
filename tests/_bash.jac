@@ -1,17 +1,9 @@
-import operator;
-
 import os;
-
+import shutil;
+import subprocess;
 import from pathlib { Path }
 
-import shutil;
+glob WINDOWS: bool = os.name == "nt";
 
-import subprocess;
-
-glob WINDOWS: any;
-
-with entry {
-    WINDOWS = operator.eq(os.name, "nt");
-}
-
-def find_bash -> any;
+"""A bash that expands shell variables: the one on PATH, else Git for Windows' own."""
+def find_bash -> str | None;
