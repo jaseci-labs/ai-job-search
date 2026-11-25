@@ -33,6 +33,7 @@ glob DATA_FILE: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).p
          *[f"\\b{word}\\b" for word in "danmark denmark scandinavia nordic group holding".split()],
          ",\\s*.*$",
      ],
+     STRIP: list[re.Pattern[str]] = [re.compile(pattern) for pattern in STRIP_PATTERNS],
      ENTRY_KEYS: set[str] = {"company", "city", "categories"},
      SETUP_HINT: str = "See tools/README_SALARY_TOOL.md for the expected format.";
 
@@ -163,8 +164,8 @@ def load_data -> any {
 """Casefolded name without legal and geographic noise; other punctuation becomes `gap`."""
 def squash(s: str, gap: str) -> str {
     s = unicodedata.normalize("NFC", s.casefold());
-    for pattern in STRIP_PATTERNS {
-        s = re.sub(pattern, "", s);
+    for pattern in STRIP {
+        s = pattern.sub("", s);
     }
     return "".join([
         c if c.isalnum() or unicodedata.category(c).startswith("M") else gap
