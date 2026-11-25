@@ -1,5 +1,12 @@
 import unittest;
 
 class TestAddPortalCommand(unittest.TestCase) {
-    def test_allowed_tools_specifies_agents_skills_path;
+    def test_allowed_tools_specifies_agents_skills_path {
+        check(
+            self,
+            command("add-portal"),
+            ["allowed-tools: Bash(bun run .agents/skills/<name>/cli/src/cli.ts *)"],
+            ["allowed-tools: Bash(bun run skills/<name>/cli/src/cli.ts *)"],
+        );
+    }
 }

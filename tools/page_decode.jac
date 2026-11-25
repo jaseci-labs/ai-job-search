@@ -37,7 +37,19 @@ glob PRESCAN_BYTES: int = 1024,
      };
 
 """The codec a page declares through a UTF-16 BOM or a <meta> tag, or None."""
-def declared_codec(raw: bytes) -> str | None;
+def declared_codec(raw: bytes) -> str | None {
+    if raw.startswith((b"\xff\xfe", b"\xfe\xff")) {
+        return "utf-16";
+    }
+    found: any = META_CHARSET.search(raw[:PRESCAN_BYTES]);
+    return LABEL_TO_CODEC.get(found.group(1).decode("ascii").lower()) if found else None;
+}
 
 """Text of a saved page: UTF-8 when valid, else its declared charset, else UTF-8 with replacement."""
-def decode_page(raw: bytes) -> str;
+def decode_page(raw: bytes) -> str {
+    try {
+        return raw.decode("utf-8");
+    } except UnicodeDecodeError {
+        return raw.decode(declared_codec(raw) or "utf-8", errors="replace");
+    }
+}
