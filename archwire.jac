@@ -10,7 +10,7 @@ graph spaces {
 
 graph import {
     tools.page_decode ++> tools.fetch_page { decode_page }
-    tools.robots_check ++> tools.fetch_page { BROWSER, gate }
+    tools.robots_check ++> tools.fetch_page { BROWSER, _force_utf8_output, gate }
     tools.report_data ++> tools.html_report { STAGES, STATUS_ORDER, load, when }
     tools.security_guards ++> tools.install_portal_clis { FORBIDDEN_SCRIPTS, INSTALL_CONFIG_FILES }
     tools.page_decode ++> tools.posting_guard { decode_page }
@@ -60,7 +60,7 @@ graph import {
     tools.posting_guard as posting_guard ++> tests.test_posting_guard;
     tests._tools ++> tests.test_rank_command { tool }
     tests._tools ++> tests.test_rank_rounding_cli { tool }
-    tools.robots_check ++> tests.test_robots_check { allowed, has_undecodable_rule, is_robots_body }
+    tools.robots_check as robots_check ++> tests.test_robots_check;
     tests._tools ++> tests.test_salary_baseline_cli { tool }
     tests._tools ++> tests.test_salary_chartsheet_cli { tool }
     tests._tools ++> tests.test_salary_combined_city_cli { root_at, tool }
@@ -130,6 +130,8 @@ graph import {
         text_start,
     }
     tools.fetch_page as fetch_page ++> tests.test_fetch_page;
+    tools.robots_check as robots_check ++> tests.test_fetch_page;
+    tests._tools ++> tests.test_fetch_page { REPO }
     tools.install_portal_clis ++> tests.test_install_portal_clis { discover, unsafe_reason }
     tools.install_portal_clis as install_portal_clis ++> tests.test_install_portal_clis;
     tests._tools ++> tests.test_install_portal_clis { rooted, tool }
@@ -138,5 +140,5 @@ graph import {
     tests._tools ++> tests.test_tools_utf8_output { rooted, tool }
     tools.verify_layout as verify_layout ++> tests.test_tools_utf8_output;
     tools.rank_state as rank_state ++> tests.test_rank_command;
-    tests._tools ++> tests.test_robots_check { tool }
+    tests._tools ++> tests.test_robots_check { REPO, tool }
 }
