@@ -73,6 +73,16 @@ graph import {
     tests._tools ++> tests.test_outcome_followup { tool }
     tools.page_decode ++> tests.test_page_decode { decode_page, declared_codec }
     tools.posting_guard as posting_guard ++> tests.test_posting_guard;
+    tests._specs ++> tests.test_apply_host_check {
+        APPLY,
+        RANK,
+        REPO,
+        between,
+        doc,
+        expect,
+        expect_not,
+        section,
+    }
     tests._specs ++> tests.test_rank_command {
         EVALUATION,
         RANK,
