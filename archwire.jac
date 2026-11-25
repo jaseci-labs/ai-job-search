@@ -36,10 +36,7 @@ graph import {
         parse_numeric_cell,
         parse_sheet,
     }
-    salary_lookup ++> tests.test_salary_cli {
-        collect_validation_issues,
-        format_entry,
-    }
+    salary_lookup ++> tests.test_salary_cli { collect_validation_issues, format_entry }
     tests._tools ++> tests.test_salary_cli { root_at, tool }
     tools.fetch_page as fetch_page ++> tests.test_fetch_deflate;
     tests._tools ++> tests.test_html_report_command { tool }
