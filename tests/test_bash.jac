@@ -1,21 +1,14 @@
-import from pathlib { Path }
-
 import subprocess;
-
 import unittest;
-
+import from pathlib { Path }
 import from unittest { mock }
 
+glob PROBE: list[str] = ["-c", "x=ok; test \"$x\" = ok"],
+     GIT: Path = Path(__file__).resolve().parent / "Git" / "cmd" / "git.exe",
+     GIT_BASH: str = str(GIT.parent.parent / "bin" / "bash.exe");
+
+def launcher_dropping_variables(args: list[str], **kwargs: any) -> subprocess.CompletedProcess;
+
 class BashDiscoveryTests(unittest.TestCase) {
-    def test_working_path_shell_is_used -> any;
-
-    def test_launcher_that_expands_variables_falls_back_to_git_bash -> any;
-
-    def test_missing_shell_needs_no_probe -> any;
-
-    def test_unusable_path_shell_falls_back_to_git_bash_on_windows -> any;
-
-    def test_failed_or_hanging_shell_is_unavailable -> any;
-
-    def test_nonzero_exit_without_a_fallback_is_unavailable -> any;
+    def test_find_bash;
 }
