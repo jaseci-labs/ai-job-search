@@ -44,6 +44,7 @@ graph import {
     tests._tools ++> tests.test_convert_salary_excel_integration { tool }
     tools.fetch_page as fetch_page ++> tests.test_fetch_deflate;
     tests._tools ++> tests.test_html_report_command { tool }
+    tools.security_guards ++> tests.test_html_report_command { ALLOWED_PERMISSIONS }
     tests._tools ++> tests.test_install_portal_hooks { rooted, tool }
     tools.job_key ++> tests.test_job_key {
         _LATIN_FOLD,
