@@ -1,63 +1,64 @@
-impl _key(name: builtins.str) -> builtins.str {
+impl _key(name: str) -> str {
     return name.lower().replace("-", "").replace("_", "");
 }
 
-impl _frontmatter(text: builtins.str) -> any {
-    lines: any;
+impl _frontmatter(text: str) -> dict[str, any] | None {
     text = text.lstrip("﻿");
-    if not text.startswith("---") {
+    lines: list[str] = text.splitlines();
+    ends: list[int] = [i for i in range(1, len(lines)) if lines[i].strip() == "---"];
+    if not text.startswith("---") or not ends {
         return None;
     }
-    lines = text.splitlines();
-    end: any = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None);
-    if end is None {
-        return None;
-    }
-    data: builtins.dict = {};
-    key: any = None;
-    for raw in lines[1:end] {
+    data: dict[str, any] = {};
+    key: str | None = None;
+    for raw in lines[1:ends[0]] {
+        found: any = _FRONTMATTER_KEY.match(raw);
         if raw[:1] in (" ", "\t") {
+            item: str = raw.strip();
             if key is None {
                 continue;
             }
-            stripped: any = raw.strip();
-            if stripped.startswith("- ") {
-                if not isinstance(data[key], `list) {
+            if item.startswith("- ") {
+                if not isinstance(data[key], list) {
                     data[key] = [];
                 }
-                data[key].append(stripped[2:].strip());
-            } elif isinstance(data[key], `str) {
-                data[key] = (data[key] + " " + stripped).strip();
+                data[key].append(item[2:].strip());
+            } elif isinstance(data[key], str) {
+                data[key] = (data[key] + " " + item).strip();
             }
-            continue;
-        }
-        `match: any = _FRONTMATTER_KEY.match(raw);
-        if not `match {
+        } elif found {
+            key = found.group(1);
+            value: str = found.group(2).strip();
+            data[key] = "" if value in (">", "|", ">-", "|-") else value;
+        } else {
             key = None;
-            continue;
         }
-        value: any;
-        (key, value) = (`match.group(1), `match.group(2).strip());
-        data[key] = "" if value in (">", "|", ">-", "|-") else value;
     }
     return data;
 }
 
-impl _tool_entries(value) -> builtins.list {
-    if isinstance(value, `list) {
-        return [`str(item).strip() for item in value if `str(item).strip()];
+impl _read(path: Path, rel: str) -> str | None {
+    try {
+        return path.read_text(encoding="utf-8");
+    } except (OSError, UnicodeDecodeError) as exc {
+        errors.append(f"{rel}: unreadable (must be UTF-8): {exc}");
+        return None;
     }
-    if not isinstance(value, `str) {
+}
+
+impl _tool_entries(value: any) -> list[str] {
+    if isinstance(value, list) {
+        return [str(item).strip() for item in value if str(item).strip()];
+    }
+    if not isinstance(value, str) {
         return [];
     }
     value = value.strip();
     if value.startswith("[") and value.endswith("]") {
         value = value[1:-1];
     }
-    entries: any;
-    depth: any;
-    current: any;
-    (entries, depth, current) = ([], 0, []);
+    entries: list[str] = [""];
+    depth: int = 0;
     for char in value {
         if char == "(" {
             depth += 1;
@@ -65,176 +66,158 @@ impl _tool_entries(value) -> builtins.list {
             depth = max(depth - 1, 0);
         }
         if char == "," and depth == 0 {
-            entries.append("".join(current).strip());
-            current = [];
+            entries.append("");
         } else {
-            current.append(char);
+            entries[-1] += char;
         }
     }
-    entries.append("".join(current).strip());
-    return [`entry for `entry in entries if `entry];
+    return [item.strip() for item in entries if item.strip()];
 }
 
-impl _own_cli_grant(path: Path) -> builtins.set {
-    try {
-        rel: any = path.relative_to(ROOT).as_posix();
-    } except ValueError {
-        return set[any]();
-    }
-    parts: any = rel.split("/");
+impl _own_cli_grant(rel: str) -> set[str] {
+    parts: list[str] = rel.split("/");
     if len(parts) == 4 and parts[:2] == [".agents", "skills"] and parts[3] == "SKILL.md" {
-        cli: any = f"bun run .agents/skills/{parts[2]}/cli/src/cli.ts";
+        cli: str = f"bun run .agents/skills/{parts[2]}/cli/src/cli.ts";
         return {f"Bash({cli} *)", f"Bash({cli}:*)"};
     }
-    return set[any]();
+    return set();
 }
 
 impl check_skill_tool_grants -> None {
-    skills: any = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
+    skills: list[Path] = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
         + sorted(ROOT.glob(".agents/skills/*/SKILL.md"));
-    commands: any = sorted((ROOT / ".claude" / "commands").rglob("*.md"));
+    commands: list[Path] = sorted((ROOT / ".claude" / "commands").rglob("*.md"));
     for path in skills + commands {
-        rel: any = path.relative_to(ROOT).as_posix();
-        try {
-            text: any = path.read_text(encoding="utf-8");
-        } except (OSError, UnicodeDecodeError) as exc {
-            errors.append(f"{rel}: unreadable (must be UTF-8): {exc}");
+        rel: str = path.relative_to(ROOT).as_posix();
+        text: str | None = _read(path, rel);
+        if text is None {
             continue;
         }
-        for `match in DYNAMIC_CONTEXT.finditer(text) {
+        for found in DYNAMIC_CONTEXT.finditer(text) {
             errors.append(
-                f"{rel}: dynamic-context line {`match.group(0)!r}. Claude Code runs a !`command` when the skill or command loads and splices its output into the prompt, with no permission check, so this is a pre-approved shell command. Move it into a step the model runs, where settings.json decides.",
+                f"{rel}: dynamic-context line {found.group(0)!r}. Claude Code runs a !`command` when the skill or command loads and splices its output into the prompt, with no permission check, so this is a pre-approved shell command. Move it into a step the model runs, where settings.json decides.",
             );
         }
-        data: any = _frontmatter(text);
-        if data is not None and "hooks" in {_key(k) for k in data} {
+        data: dict[str, any] | None = _frontmatter(text);
+        if data is None {
+            if path not in commands {
+                errors.append(f"{rel}: missing or unterminated frontmatter (expected --- ... ---)");
+            }
+            continue;
+        }
+        if "hooks" in {_key(k) for k in data} {
             errors.append(
                 f"{rel}: frontmatter `hooks`. A skill or command hook runs its command with no prompt whenever its event fires while the skill is active; the template ships no hooks (SECURITY.md), and settings.json hooks are held to ALLOWED_HOOKS.",
             );
         }
-        if data is None {
-            if path in commands {
+        permitted: set[str] = _own_cli_grant(rel) or ALLOWED_SKILL_TOOLS;
+        for item in _tool_entries(data.get("allowed-tools", "")) {
+            if item in permitted {
                 continue;
             }
-            errors.append(f"{rel}: missing or unterminated frontmatter (expected --- ... ---)");
-            continue;
-        }
-        own_cli: any = _own_cli_grant(path);
-        permitted: any = own_cli or ALLOWED_SKILL_TOOLS;
-        for `entry in _tool_entries(data.get("allowed-tools", "")) {
-            if `entry in permitted {
-                continue;
-            }
-            if "*" in `entry and not (`entry.endswith((" *)", ":*)")) and "*" not in `entry[:-2]) {
+            if "*" in item and not (item.endswith((" *)", ":*)")) and "*" not in item[:-2]) {
                 errors.append(
-                    f"{rel}: allowed-tools entry uses a wildcard inside the pattern: {`entry!r}. A glob here pre-approves whatever lands at that path, including code added later; name the exact command instead.",
+                    f"{rel}: allowed-tools entry uses a wildcard inside the pattern: {item!r}. A glob here pre-approves whatever lands at that path, including code added later; name the exact command instead.",
                 );
-                continue;
+            } else {
+                errors.append(
+                    f"{rel}: allowed-tools entry not in the reviewed allowlist: {item!r}. Claude Code pre-approves allowed-tools for the turn that invokes the skill, with no prompt and regardless of workspace trust, so this line is a permission allowlist like settings.json. Bare Bash means any command. If the grant is intentional, add it to ALLOWED_SKILL_TOOLS in tools/security_guards.jac in the same PR; a portal skill may grant only its own .agents/skills/<name>/cli/src/cli.ts.",
+                );
             }
-            errors.append(
-                f"{rel}: allowed-tools entry not in the reviewed allowlist: {`entry!r}. Claude Code pre-approves allowed-tools for the turn that invokes the skill, with no prompt and regardless of workspace trust, so this line is a permission allowlist like settings.json. Bare Bash means any command. If the grant is intentional, add it to ALLOWED_SKILL_TOOLS in tools/security_guards.jac in the same PR; a portal skill may grant only its own .agents/skills/<name>/cli/src/cli.ts.",
-            );
         }
     }
 }
 
-impl _hook_commands(event: builtins.str, entries: builtins.object) -> Generator[any, any, any] {
-    unrecognised: any = f"{event}:<unrecognised hook shape>";
-    if not isinstance(entries, `list) {
-        yield unrecognised;
-        return;
+impl _hook_commands(event: str, entries: any) -> list[str] {
+    unrecognised: str = f"{event}:<unrecognised hook shape>";
+    if not isinstance(entries, list) {
+        return [unrecognised];
     }
-    for `entry in entries {
-        if not isinstance(`entry, `dict) {
-            yield unrecognised;
-            continue;
-        }
-        inner: any = `entry.get("hooks");
-        if not isinstance(inner, `list) {
-            yield unrecognised;
+    commands: list[str] = [];
+    for item in entries {
+        inner: any = item.get("hooks") if isinstance(item, dict) else None;
+        if not isinstance(inner, list) {
+            commands.append(unrecognised);
             continue;
         }
         for hook in inner {
-            command: any = hook.get("command") if isinstance(hook, `dict) else None;
-            yield f"{event}:{command}" if isinstance(command, `str) else unrecognised;
+            command: any = hook.get("command") if isinstance(hook, dict) else None;
+            commands.append(f"{event}:{command}" if isinstance(command, str) else unrecognised);
         }
     }
+    return commands;
+}
+
+impl _is_str_list(value: any) -> bool {
+    return isinstance(value, list) and all([isinstance(item, str) for item in value]);
 }
 
 impl check_permissions -> None {
-    `entry: any;
-    path: any = ROOT / ".claude" / "settings.json";
     try {
-        data: any = json.loads(path.read_text(encoding="utf-8"));
+        data: any = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"));
     } except (OSError, json.JSONDecodeError) as exc {
         errors.append(f".claude/settings.json: unreadable or invalid JSON: {exc}");
         return;
     }
-    if not isinstance(data, `dict) {
+    if not isinstance(data, dict) {
         errors.append(".claude/settings.json: top-level JSON value must be an object");
         return;
     }
-    key: any;
-    for key in sorted(`set(data) - ALLOWED_SETTINGS_KEYS) {
+    for key in sorted([k for k in data if k not in ALLOWED_SETTINGS_KEYS]) {
         errors.append(
             f".claude/settings.json: top-level setting not in the reviewed allowlist: {key!r}. Only `permissions` and `hooks` are checked here; any other key (env, apiKeyHelper, statusLine, enableAllProjectMcpServers, ...) can run a program or change what every pre-approved tool sees, with no prompt, on every fork. If the key is intentional, add it to ALLOWED_SETTINGS_KEYS in tools/security_guards.jac in the same PR and extend the guard to check its value.",
         );
     }
     hooks: any = data.get("hooks", {});
-    if hooks {
-        if not isinstance(hooks, `dict) {
-            errors.append(".claude/settings.json: hooks must be an object");
-        } else {
-            for (event, entries) in hooks.items() {
-                for command in _hook_commands(`str(event), entries) {
-                    if command not in ALLOWED_HOOKS {
-                        errors.append(
-                            f".claude/settings.json: hook not in the reviewed allowlist: {command!r}. A hook runs automatically when its event fires - it is never gated by the permissions prompt, so it executes on every fork without the user agreeing to anything. If this hook is intentional, add it to ALLOWED_HOOKS in tools/security_guards.jac in the same PR so the addition is explicit and reviewable.",
-                        );
-                    }
+    if hooks and not isinstance(hooks, dict) {
+        errors.append(".claude/settings.json: hooks must be an object");
+    } elif hooks {
+        for (event, entries) in hooks.items() {
+            for command in _hook_commands(str(event), entries) {
+                if command not in ALLOWED_HOOKS {
+                    errors.append(
+                        f".claude/settings.json: hook not in the reviewed allowlist: {command!r}. A hook runs automatically when its event fires - it is never gated by the permissions prompt, so it executes on every fork without the user agreeing to anything. If this hook is intentional, add it to ALLOWED_HOOKS in tools/security_guards.jac in the same PR so the addition is explicit and reviewable.",
+                    );
                 }
             }
         }
     }
-
     permissions: any = data.get("permissions", {});
-    if not isinstance(permissions, `dict) {
+    if not isinstance(permissions, dict) {
         errors.append(".claude/settings.json: permissions must be an object");
         return;
     }
-    for key in sorted(`set(permissions) - ALLOWED_PERMISSIONS_KEYS) {
+    for key in sorted([k for k in permissions if k not in ALLOWED_PERMISSIONS_KEYS]) {
         errors.append(
             f".claude/settings.json: permissions setting not in the reviewed allowlist: {key!r}. `defaultMode: bypassPermissions` turns every prompt off and `additionalDirectories` widens what the rules scope, so the allow, ask and deny lists are only as strong as the keys beside them. If the key is intentional, add it to ALLOWED_PERMISSIONS_KEYS in tools/security_guards.jac in the same PR and extend the guard to check its value.",
         );
     }
     allow: any = permissions.get("allow", []);
-    if not isinstance(allow, `list) or not all(isinstance(`entry, `str) for `entry in allow) {
+    if not _is_str_list(allow) {
         errors.append(".claude/settings.json: permissions.allow must be a list of strings");
         return;
     }
-    for `entry in allow {
-        if `entry not in ALLOWED_PERMISSIONS {
+    for item in allow {
+        if item not in ALLOWED_PERMISSIONS {
             errors.append(
-                f".claude/settings.json: permission not in the reviewed allowlist: {`entry!r}. Pre-approved permissions run without prompting on every fork. If this entry is intentional, add it to ALLOWED_PERMISSIONS in tools/security_guards.jac in the same PR so the widening is explicit and reviewable.",
+                f".claude/settings.json: permission not in the reviewed allowlist: {item!r}. Pre-approved permissions run without prompting on every fork. If this entry is intentional, add it to ALLOWED_PERMISSIONS in tools/security_guards.jac in the same PR so the widening is explicit and reviewable.",
             );
         }
     }
-    for `entry in ALLOWED_PERMISSIONS - `set(allow) {
-        print(f"note: allowlisted permission not present in settings.json: {`entry!r}");
+    for item in [p for p in ALLOWED_PERMISSIONS if p not in allow] {
+        print(f"note: allowlisted permission not present in settings.json: {item!r}");
     }
-
     for (key, required, effect) in (
         ("ask", REQUIRED_ASK_RULES, "an ask rule forces a prompt even over a skill grant"),
         ("deny", REQUIRED_DENY_RULES, "a deny rule blocks in every mode, bypass included"),
     ) {
         rules: any = permissions.get(key, []);
-        if not isinstance(rules, `list) or not all(isinstance(`entry, `str) for `entry in rules) {
+        if not _is_str_list(rules) {
             errors.append(f".claude/settings.json: permissions.{key} must be a list of strings");
             continue;
         }
-        present: any = `set(rules);
         for rule in required {
-            if rule not in present {
+            if rule not in rules {
                 errors.append(
                     f".claude/settings.json: required {key} rule missing: {rule!r}. Removing it silently re-opens what it closed ({effect}). If the change is intentional, update REQUIRED_{key.upper()}_RULES in tools/security_guards.jac in the same PR so the widening is explicit and reviewable.",
                 );
@@ -243,44 +226,45 @@ impl check_permissions -> None {
     }
 }
 
-impl _gitignore_lines(path: Path) -> builtins.list[builtins.str] {
+impl _gitignore_lines(path: Path) -> list[str] {
     return [
         re.sub("(?<!\\\\)\\s+$", "", line)
         for line in path.read_text(encoding="utf-8").splitlines()
     ];
 }
 
-impl _other_gitignores -> Generator[any, any, any] {
+impl _other_gitignores -> list[Path] {
+    found: list[Path] = [];
     for (dirpath, dirnames, filenames) in os.walk(ROOT) {
-        dirnames[:] = sorted(d for d in dirnames if d not in (".git", "node_modules"));
+        dirnames[:] = sorted([d for d in dirnames if d not in (".git", "node_modules")]);
         if ".gitignore" in filenames and Path(dirpath) != ROOT {
-            yield Path(dirpath) / ".gitignore";
+            found.append(Path(dirpath) / ".gitignore");
         }
     }
+    return found;
 }
 
-impl _normalized_pattern(pattern: builtins.str) -> builtins.str {
-    pattern = pattern.strip();
-    while pattern.startswith("./") {
-        pattern = pattern[2:];
-    }
-    return pattern.lstrip("/");
+impl _normalized_pattern(pattern: str) -> str {
+    return re.sub("^(\\./)*/*", "", pattern.strip());
 }
 
-impl load_local_negations -> builtins.set[builtins.str] {
+impl load_local_negations -> set[str] {
+    extra: set[str] = set();
     if not LOCAL_NEGATIONS_FILE.is_file() {
-        return set[any]();
+        return extra;
     }
     try {
-        raw: any = LOCAL_NEGATIONS_FILE.read_text(encoding="utf-8").splitlines();
+        raw: list[str] = LOCAL_NEGATIONS_FILE.read_text(encoding="utf-8").splitlines();
     } except OSError as exc {
         errors.append(f".github/security-guards-local.txt: unreadable: {exc}");
-        return set[any]();
+        return extra;
     }
-    extra: builtins.set[builtins.str] = set[any]();
-    line: any;
-    for (number, line) in enumerate(raw, 1) {
-        line = line.strip();
+    required: set[str] = {
+        _normalized_pattern(rule)
+        for rule in REQUIRED_IGNORE_RULES
+        if not rule.startswith("!")
+    };
+    for (number, line) in enumerate([text.strip() for text in raw], 1) {
         if not line or line.startswith("#") {
             continue;
         }
@@ -288,15 +272,13 @@ impl load_local_negations -> builtins.set[builtins.str] {
             errors.append(
                 f".github/security-guards-local.txt:{number}: {line!r} is not a negation. The file may only list `!pattern` lines that extend the .gitignore negation allowlist.",
             );
-            continue;
-        }
-        if _normalized_pattern(line[1:]) in _REQUIRED_IGNORE_PATTERNS {
+        } elif _normalized_pattern(line[1:]) in required {
             errors.append(
                 f".github/security-guards-local.txt:{number}: {line!r} negates a required personal-data ignore rule (REQUIRED_IGNORE_RULES). A fork may re-include its own tracked paths, never the rule that keeps personal data out of git.",
             );
-            continue;
+        } else {
+            extra.add(line);
         }
-        extra.add(line);
     }
     return extra;
 }
@@ -310,24 +292,21 @@ impl check_local_negations_absent_upstream -> None {
 }
 
 impl check_gitignore -> None {
-    path: any = ROOT / ".gitignore";
     try {
-        lines: any = _gitignore_lines(path);
+        lines: list[str] = _gitignore_lines(ROOT / ".gitignore");
     } except OSError as exc {
         errors.append(f".gitignore: unreadable: {exc}");
         return;
     }
-    rules: any = `set(lines);
     for rule in REQUIRED_IGNORE_RULES {
-        if rule not in rules {
+        if rule not in lines {
             errors.append(
                 f".gitignore: required personal-data rule missing: {rule!r}. These rules keep fork users from committing personal data. If the rule moved or was renamed intentionally, update REQUIRED_IGNORE_RULES in tools/security_guards.jac in the same PR.",
             );
         }
     }
     check_local_negations_absent_upstream();
-    allowed_negations: any = ALLOWED_IGNORE_NEGATIONS | load_local_negations();
-    line: any;
+    allowed_negations: set[str] = ALLOWED_IGNORE_NEGATIONS | load_local_negations();
     for line in lines {
         if line.startswith("!") and line not in allowed_negations {
             errors.append(
@@ -336,22 +315,18 @@ impl check_gitignore -> None {
         }
     }
     for sub in _other_gitignores() {
-        rel: any = sub.relative_to(ROOT).as_posix();
+        rel: str = sub.relative_to(ROOT).as_posix();
         try {
-            sub_lines: any = _gitignore_lines(sub);
+            sub_lines: list[str] = _gitignore_lines(sub);
         } except OSError as exc {
             errors.append(f"{rel}: unreadable: {exc}");
             continue;
         }
         for line in sub_lines {
-            if line.startswith("!") and f"{rel}:{line}" not in ALLOWED_IGNORE_NEGATIONS {
+            scoped: str = f"{rel}:{line}";
+            if line.startswith("!") and scoped not in ALLOWED_IGNORE_NEGATIONS {
                 errors.append(
-                    format(rel, "")
-                        + ": negation rule not in the reviewed allowlist: "
-                        + format(repr(line), "")
-                        + ". A subdirectory .gitignore takes precedence over the root file, so this re-includes paths the root rules exclude. If it is intentional, add "
-                        + format(repr(rel + ":" + line), "")
-                        + " to ALLOWED_IGNORE_NEGATIONS in tools/security_guards.jac in the same PR.",
+                    f"{rel}: negation rule not in the reviewed allowlist: {line!r}. A subdirectory .gitignore takes precedence over the root file, so this re-includes paths the root rules exclude. If it is intentional, add {scoped!r} to ALLOWED_IGNORE_NEGATIONS in tools/security_guards.jac in the same PR.",
                 );
             }
         }
@@ -359,46 +334,39 @@ impl check_gitignore -> None {
 }
 
 impl check_package_manifests -> None {
-    manifests: any = [
-        p
-        for p in ROOT.glob(".agents/**/package.json")
-        if "node_modules" not in p.parts
-    ];
-    for manifest in manifests {
-        relpath: any = manifest.relative_to(ROOT);
+    for manifest in ROOT.glob(".agents/**/package.json") {
+        if "node_modules" in manifest.parts {
+            continue;
+        }
+        relpath: Path = manifest.relative_to(ROOT);
         try {
             data: any = json.loads(manifest.read_text(encoding="utf-8"));
         } except (OSError, json.JSONDecodeError) as exc {
             errors.append(f"{relpath}: unreadable or invalid JSON: {exc}");
             continue;
         }
-        if not isinstance(data, `dict) {
+        if not isinstance(data, dict) {
             errors.append(f"{relpath}: top-level JSON value must be an object");
             continue;
         }
         scripts: any = data.get("scripts", {});
-        if not isinstance(scripts, `dict) {
+        if not isinstance(scripts, dict) {
             errors.append(f"{relpath}: scripts must be an object");
             continue;
         }
-        bad: any = FORBIDDEN_SCRIPTS & `set(scripts);
+        bad: list[str] = sorted([s for s in scripts if s in FORBIDDEN_SCRIPTS]);
         if bad {
             errors.append(
-                f"{relpath}: lifecycle script(s) {sorted(bad)} are forbidden - they execute arbitrary code during `bun install` on every fork user's machine.",
+                f"{relpath}: lifecycle script(s) {bad} are forbidden - they execute arbitrary code during `bun install` on every fork user's machine.",
             );
         }
-        if "trustedDependencies" in data {
-            errors.append(
-                f"{relpath}: trustedDependencies is forbidden - it re-enables dependency lifecycle scripts that bun blocks by default.",
-            );
-        }
-        if "workspaces" in data {
-            errors.append(
-                f"{relpath}: workspaces is forbidden - each workspace package brings its own lifecycle scripts, which this check never reads, into `bun install`.",
-            );
+        for (key, why) in FORBIDDEN_MANIFEST_KEYS.items() {
+            if key in data {
+                errors.append(f"{relpath}: {key} is forbidden - {why}.");
+            }
         }
         for name in INSTALL_CONFIG_FILES {
-            config: any = manifest.parent / name;
+            config: Path = manifest.parent / name;
             if config.exists() {
                 errors.append(
                     f"{config.relative_to(ROOT)}: a {name} beside a portal manifest is forbidden - it reconfigures `bun install` itself (registry, scopes, trusted packages) for every fork user.",
@@ -420,7 +388,7 @@ impl check_tracked_node_modules -> None {
         return;
     }
     for rel in proc.stdout.decode("utf-8", errors="replace").split("\x00") {
-        if rel and "node_modules" in rel.split("/") {
+        if "node_modules" in rel.split("/") {
             errors.append(
                 f"tracked path inside node_modules: {rel!r}. Installed dependencies (or a symlink standing in for them) must never be committed: run `git rm --cached` on it; .gitignore's `node_modules` rule keeps it out.",
             );
@@ -430,21 +398,20 @@ impl check_tracked_node_modules -> None {
 
 impl check_agent_tool_grants -> None {
     for path in sorted((ROOT / ".claude" / "agents").rglob("*.md")) {
-        rel: any = path.relative_to(ROOT).as_posix();
-        try {
-            data: any = _frontmatter(path.read_text(encoding="utf-8"));
-        } except (OSError, UnicodeDecodeError) as exc {
-            errors.append(f"{rel}: unreadable (must be UTF-8): {exc}");
+        rel: str = path.relative_to(ROOT).as_posix();
+        text: str | None = _read(path, rel);
+        if text is None {
             continue;
         }
+        data: dict[str, any] | None = _frontmatter(text);
         if data is None {
             errors.append(f"{rel}: missing or unterminated frontmatter (expected --- ... ---)");
             continue;
         }
-        keyed: any = {_key(k): v for (k, v) in data.items()};
+        keyed: dict[str, any] = {_key(k): v for (k, v) in data.items()};
         mode: any = keyed.get("permissionmode");
         if mode is not None
-            and `str(mode).strip().strip("'\"") not in ALLOWED_AGENT_PERMISSION_MODES
+            and str(mode).strip().strip("'\"") not in ALLOWED_AGENT_PERMISSION_MODES
         {
             errors.append(
                 f"{rel}: permissionMode {mode!r}. An agent's mode applies to every call it makes, and this one removes prompts the allowlists here assume; use one of {sorted(ALLOWED_AGENT_PERMISSION_MODES)} or omit the key.",
@@ -458,30 +425,30 @@ impl check_agent_tool_grants -> None {
                 errors.append(f"{rel}: frontmatter `{key}`: an agent-scoped entry {why}.");
             }
         }
-        if "tools" not in data or not _tool_entries(data.get("tools")) {
+        tools: list[str] = _tool_entries(data.get("tools"));
+        if not tools {
             errors.append(
                 f"{rel}: no `tools:` key - an agent without one gets every tool, including Edit, Write and Bash. Shipped agents read untrusted posting text; declare an explicit list drawn from {sorted(ALLOWED_AGENT_TOOLS)}.",
             );
-            continue;
         }
-        for `entry in _tool_entries(data.get("tools")) {
-            if `entry in ALLOWED_AGENT_TOOLS {
+        for item in tools {
+            if item in ALLOWED_AGENT_TOOLS {
                 continue;
             }
-            if "(" in `entry {
+            if "(" in item {
                 errors.append(
-                    f"{rel}: tools entry {`entry!r} looks scoped but is not - an agent's `tools:` list is tool-name granularity (a `Bash(pattern)` entry gives the agent plain Bash). List the bare tool and let settings.json's allow list scope it.",
+                    f"{rel}: tools entry {item!r} looks scoped but is not - an agent's `tools:` list is tool-name granularity (a `Bash(pattern)` entry gives the agent plain Bash). List the bare tool and let settings.json's allow list scope it.",
                 );
-                continue;
+            } else {
+                errors.append(
+                    f"{rel}: tools entry not in the reviewed allowlist: {item!r}. Shipped agent definitions read untrusted posting text, so they may not edit or write files or spawn further agents. If the grant is intentional, add it to ALLOWED_AGENT_TOOLS in tools/security_guards.jac in the same PR.",
+                );
             }
-            errors.append(
-                f"{rel}: tools entry not in the reviewed allowlist: {`entry!r}. Shipped agent definitions read untrusted posting text, so they may not edit or write files or spawn further agents. If the grant is intentional, add it to ALLOWED_AGENT_TOOLS in tools/security_guards.jac in the same PR.",
-            );
         }
     }
 }
 
-impl main -> builtins.int {
+impl main -> int {
     check_permissions();
     check_gitignore();
     check_package_manifests();
