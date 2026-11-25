@@ -27,11 +27,15 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
      NO_TEXT_VERDICT: str = "posting_guard: refused (no text to evaluate)",
      EXCERPT: int = 120,
      LINE_MAX: int = 200,
-     ZERO_WIDTH: str = "​‌‍⁠⁡⁢⁣⁤",
-     BIDI: str = "‎‏‪‫‬‭‮⁦⁧⁨⁩",
-     BIDI_TAMPER: str = "‭‮⁦⁧⁨⁩",
-     FORMAT: str = "­  ",
-     BOM: str = "﻿",
+     ZERO_WIDTH: str = "".join(
+         map(chr, [0x200B, 0x200C, 0x200D, 0x2060, 0x2061, 0x2062, 0x2063, 0x2064])
+     ),
+     BIDI: str = "".join(
+         map(chr, [0x200E, 0x200F, *range(0x202A, 0x202F), *range(0x2066, 0x206A)])
+     ),
+     BIDI_TAMPER: str = "".join(map(chr, [0x202D, 0x202E, 0x2066, 0x2067, 0x2068, 0x2069])),
+     FORMAT: str = "".join(map(chr, [0x00AD, 0x2028, 0x2029])),
+     BOM: str = chr(0xFEFF),
      TAG_BASE: int = 0xE0000,
      TAG_CHARS: str = "".join([chr(c) for c in range(TAG_BASE, TAG_BASE + 128)]),
      INVISIBLE: str = ZERO_WIDTH + BIDI + FORMAT + BOM + TAG_CHARS,
@@ -41,12 +45,12 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
          "format": FORMAT,
          "bom": BOM,
      },
-     TAG_RUN: re.Pattern[str] = re.compile("[\U000e0000-\U000e007f]+"),
+     TAG_RUN: re.Pattern[str] = re.compile("[\\U000e0000-\\U000e007f]+"),
      RGI_TAG_FLAG: re.Pattern[str] = re.compile(
-         "\U0001f3f4\U000e0067\U000e0062(?:\U000e0065\U000e006e\U000e0067|\U000e0073\U000e0063\U000e0074|\U000e0077\U000e006c\U000e0073)\U000e007f",
+         "\\U0001f3f4\\U000e0067\\U000e0062(?:\\U000e0065\\U000e006e\\U000e0067|\\U000e0073\\U000e0063\\U000e0074|\\U000e0077\\U000e006c\\U000e0073)\\U000e007f",
      ),
-     VARIATION: re.Pattern[str] = re.compile("[︀-️\U000e0100-\U000e01ef]"),
-     VARIATION_RUN: re.Pattern[str] = re.compile("[︀-️\U000e0100-\U000e01ef]{2,}"),
+     VARIATION: re.Pattern[str] = re.compile("[\\ufe00-\\ufe0f\\U000e0100-\\U000e01ef]"),
+     VARIATION_RUN: re.Pattern[str] = re.compile("[\\ufe00-\\ufe0f\\U000e0100-\\U000e01ef]{2,}"),
      HIDDEN_STYLE: re.Pattern[str] = re.compile(
          "(?:^|;)\\s*(?:display\\s*:\\s*none|visibility\\s*:\\s*(?:hidden|collapse)|opacity\\s*:\\s*0(?![.\\d]*[1-9])|font-size\\s*:\\s*(?:0(?:\\.0+)?(?:px|pt|em|rem|%)?(?![\\d.])|[012](?:\\.\\d+)?px(?![\\w.%]))|transform\\s*:[^;]*\\bscale(?:[XYZ]|3d)?\\(\\s*0(?![.\\d]*[1-9])|color\\s*:\\s*transparent|clip\\s*:\\s*rect\\(\\s*0|clip-path\\s*:\\s*inset\\(\\s*(?:100%|(?:5\\d|[6-9]\\d|100)(?:\\.\\d+)?%\\s*\\))|(?:(?:margin-)?(?:left|top)|text-indent)\\s*:\\s*-(?:99\\d+|\\d{4,})(?:px|em|rem))",
          re.I,
@@ -104,7 +108,7 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
      ],
      WORD: re.Pattern[str] = re.compile("\\w+", re.UNICODE),
      LATIN: re.Pattern[str] = re.compile("[A-Za-z]"),
-     CONFUSABLE: re.Pattern[str] = re.compile("[Ѐ-ӿͰ-Ͽ]"),
+     CONFUSABLE: re.Pattern[str] = re.compile("[\\u0400-\\u04ff\\u0370-\\u03ff]"),
      ALARMS: list[tuple[str, str]] = [
          ("instruction-like line", "instruction-like lines"),
          ("invisible character inside words", "invisible characters inside words"),
