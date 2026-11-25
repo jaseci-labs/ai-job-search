@@ -1,5 +1,5 @@
 import base64;
-import hashlib, http.server, io, json, os, shutil, subprocess, tarfile, threading, unittest;
+import hashlib, http.server, io, json, os, shutil, tarfile, threading, unittest;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 

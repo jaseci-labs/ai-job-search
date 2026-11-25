@@ -1,4 +1,4 @@
-import csv, json, subprocess, unittest;
+import csv, json, unittest;
 import from pathlib { Path }
 import from tempfile { TemporaryDirectory }
 
