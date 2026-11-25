@@ -1,25 +1,20 @@
-impl _is_upstream_url(url: builtins.str) -> builtins.bool {
-    lowered: any = url.strip().lower();
-    slug: any = UPSTREAM.lower();
-    for prefix in (_HTTPS_PREFIX, _SSH_PREFIX, _SSH_URL_PREFIX) {
+impl _is_upstream_url(url: str) -> bool {
+    lowered = url.strip().lower();
+    for prefix in GITHUB_PREFIXES {
         if lowered.startswith(prefix) {
-            rest: any = lowered[len(prefix):].rstrip("/");
-            if rest.endswith(".git") {
-                rest = rest[:-len(".git")];
-            }
-            return operator.eq(rest, slug);
+            return lowered[len(prefix):].rstrip("/").removesuffix(".git") == UPSTREAM.lower();
         }
     }
     return False;
 }
 
-impl is_upstream_checkout -> builtins.bool {
-    env_repo: any = os.environ.get("GITHUB_REPOSITORY");
+impl is_upstream_checkout -> bool {
+    env_repo = os.environ.get("GITHUB_REPOSITORY");
     if env_repo {
-        return operator.eq(env_repo, UPSTREAM);
+        return env_repo == UPSTREAM;
     }
     try {
-        origin: any = subprocess.run(
+        origin = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             cwd=REPO,
             capture_output=True,
@@ -29,8 +24,5 @@ impl is_upstream_checkout -> builtins.bool {
     } except (OSError, subprocess.SubprocessError) {
         return True;
     }
-    if origin.returncode != 0 {
-        return True;
-    }
-    return _is_upstream_url(origin.stdout);
+    return origin.returncode != 0 or _is_upstream_url(origin.stdout);
 }

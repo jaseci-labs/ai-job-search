@@ -1,312 +1,207 @@
-impl git(`root: Path, *args_: builtins.str) -> builtins.str {
-    args: any = tuple(args_);
+impl TriageRepoFixture.setUp -> None {
+    self.new_repo();
+}
+
+impl TriageRepoFixture.new_repo -> None {
+    self.root = Path(tempfile.mkdtemp());
+    self.addCleanup(shutil.rmtree, self.root, ignore_errors=True);
+    self.git("init", "-b", "master");
+    self.git("config", "user.name", "Test");
+    self.git("config", "user.email", "test@example.com");
+    self.git("remote", "add", "upstream", f"https://github.com/{UPSTREAM_SLUG}.git");
+    self.commit("init", {"shared.txt": "base\n", "kept.py": "print('hi')\n"});
+}
+
+impl TriageRepoFixture.git(*args: str) -> str {
     return subprocess.run(
-        ["git", *args], cwd=`root, check=True, capture_output=True, text=True
+        ["git", *args], cwd=self.root, check=True, capture_output=True, text=True
     ).stdout;
 }
 
-impl TriageRepoFixture.setUp -> any {
-    self.root = Path(tempfile.mkdtemp());
-    self.addCleanup(shutil.rmtree, self.root, ignore_errors=True);
-
-    (self.root / "tools").mkdir();
-    (self.root / ".github").mkdir();
-
-    git(self.root, "init", "-b", "master");
-    git(self.root, "config", "user.name", "Test");
-    git(self.root, "config", "user.email", "test@example.com");
-    git(self.root, "remote", "add", "upstream", f"https://github.com/{UPSTREAM_SLUG}.git");
-
-    self.write("shared.txt", "base\n");
-    self.write("kept.py", "print('hi')\n");
-    self.commit("init");
+impl TriageRepoFixture.commit(msg: str, files: dict[str, str] = {}) -> str {
+    for (rel, text) in files.items() {
+        (self.root / rel).parent.mkdir(parents=True, exist_ok=True);
+        (self.root / rel).write_text(text, encoding="utf-8");
+    }
+    self.git("add", "-A");
+    self.git("commit", "-m", msg);
+    return self.git("rev-parse", "HEAD").strip();
 }
 
-impl TriageRepoFixture.write(rel: builtins.str, text: builtins.str) -> None {
-    path: any = self.root / rel;
-    path.parent.mkdir(parents=True, exist_ok=True);
-    path.write_text(text, encoding="utf-8");
+impl TriageRepoFixture.fork_point(back: int = 1) -> None {
+    self.git("update-ref", "refs/remotes/upstream/master", "HEAD");
+    self.git("reset", "--hard", f"HEAD~{back}");
 }
 
-impl TriageRepoFixture.commit(msg: builtins.str) -> builtins.str {
-    git(self.root, "add", "-A");
-    git(self.root, "commit", "-m", msg);
-    return git(self.root, "rev-parse", "HEAD").strip();
+impl TriageRepoFixture.triage(shows: list[str] = [], lacks: list[str] = []) -> str {
+    result = subprocess.run(tool("upstream_triage"), cwd=self.root, capture_output=True, text=True);
+    self.assertEqual(result.returncode, 0, result.stderr);
+    for needle in shows {
+        self.assertIn(needle, result.stdout);
+    }
+    for needle in lacks {
+        self.assertNotIn(needle, result.stdout);
+    }
+    return result.stdout;
 }
 
-impl TriageRepoFixture.set_upstream_to_head -> None {
-    git(self.root, "update-ref", "refs/remotes/upstream/master", "HEAD");
+impl TriageTests.test_missing_ref_then_up_to_date {
+    self.triage(["was not available"]);
+    self.fork_point(0);
+    self.triage(["Up to date"]);
 }
 
-impl TriageRepoFixture.run_triage(*args__) -> subprocess.CompletedProcess {
-    args: any = tuple(args__);
-    return subprocess.run(
-        [*tool("upstream_triage"), *args], cwd=self.root, capture_output=True, text=True
+impl TriageTests.test_relevance_filter {
+    cases: list[tuple[str, dict[str, str], dict[str, str], str | None, str | None]] = [
+        ("only removed files", {PORTAL: "1\n"}, {PORTAL: "2\n"}, PORTAL, NOT_IN_FORK),
+        ("kept file", {}, {"kept.py": "print('changed')\n"}, None, None),
+        (
+            "changelog only",
+            {PORTAL: "1\n", LOG: "- a\n"},
+            {PORTAL: "2\n", LOG: "- b\n"},
+            PORTAL,
+            CHANGELOG_ONLY,
+        ),
+        ("new upstream tool", {}, NEW_TOOL, None, None),
+        (
+            "new file in removed dir",
+            {"gone/src/cli.ts": "a\n"},
+            {"gone/tests/t.ts": "b\n"},
+            "gone",
+            NOT_IN_FORK,
+        ),
+        ("new dir in kept dir", {"kept/cli.ts": "a\n"}, {"kept/tests/new/t.ts": "b\n"}, None, None),
+        ("new tool with changelog", {LOG: "- a\n"}, {**NEW_TOOL, LOG: "- b\n"}, None, None),
+    ];
+    for (label, shared, upstream, removed, why) in cases {
+        with self.subTest(label) {
+            self.new_repo();
+            if shared {
+                self.commit("shared: base", shared);
+            }
+            pick: str = "git cherry-pick " + self.commit("upstream: change", upstream);
+            self.fork_point();
+            if removed {
+                self.git("rm", "-r", removed);
+                self.commit("fork: remove demo portal");
+            }
+            before = self.git("status", "--porcelain");
+            if why {
+                self.triage(["**0** worth reviewing", "Probably skip", why], [pick]);
+            } else {
+                self.triage(
+                    ["**1** worth reviewing", pick, *[rel for rel in upstream if rel != LOG]],
+                    [NOT_IN_FORK, CHANGELOG_ONLY],
+                );
+            }
+            self.assertEqual(self.git("status", "--porcelain"), before);
+            for (rel, text) in upstream.items() {
+                path = self.root / rel;
+                self.assertFalse(path.exists() and path.read_text(encoding="utf-8") == text);
+            }
+        }
+    }
+}
+
+impl TriageTests.test_cherry_picked_commit_drops_off_via_patch_id {
+    upstream_sha = self.commit("upstream: add feature", {"kept.py": "print('feature')\n"});
+    self.commit("upstream: unrelated change", {"shared.txt": "upstream edit\n"});
+    self.fork_point(2);
+    self.commit("fork: divergent commit", {"fork_only.txt": "mine\n"});
+    self.git("cherry-pick", upstream_sha);
+    self.triage([APPLIED, "**1** worth reviewing"]);
+}
+
+impl TriageTests.test_different_patch_with_same_subject_requests_verification {
+    upstream_sha = self.commit("Fix configuration", {"kept.py": "print('upstream fix')\n"});
+    self.fork_point();
+    fork_sha = self.commit("Fix configuration", {"shared.txt": "fork configuration\n"});
+    self.triage(
+        [
+            "**0** worth reviewing",
+            f"subject matches fork commit {fork_sha[:9]}, patch differs: verify",
+        ],
+        [f"git cherry-pick {upstream_sha}", APPLIED],
     );
 }
 
-impl UpToDateTests.test_reports_up_to_date_when_not_behind -> any {
-    self.set_upstream_to_head();
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("Up to date", result.stdout);
-}
-
-impl RelevanceFilterTests.test_commit_touching_only_removed_files_is_skipped -> any {
-    self.write("portals/removed_portal.py", "x = 1\n");
-    self.commit("shared: add portal");
-    self.write("portals/removed_portal.py", "x = 2\n");
-    self.commit("upstream: update portal");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    git(self.root, "rm", "portals/removed_portal.py");
-    self.commit("fork: remove demo portal");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("touches only files not in this fork", result.stdout);
-    self.assertIn("Probably skip", result.stdout);
-}
-
-impl RelevanceFilterTests.test_commit_touching_kept_files_is_worth_reviewing -> any {
-    self.write("kept.py", "print('changed')\n");
-    self.commit("upstream: change kept.py");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("Worth reviewing", result.stdout);
-    self.assertIn("kept.py", result.stdout);
-    self.assertIn("git cherry-pick", result.stdout);
-}
-
-impl RelevanceFilterTests.test_changelog_only_footprint_is_skipped -> any {
-    self.write("portals/gone.py", "y = 1\n");
-    self.write("CHANGELOG.md", "- base\n");
-    self.commit("shared: add portal and changelog");
-    self.write("portals/gone.py", "y = 2\n");
-    self.write("CHANGELOG.md", "- did a thing\n");
-    self.commit("upstream: feature living in removed area + changelog");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    git(self.root, "rm", "portals/gone.py");
-    self.commit("fork: remove demo portal");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("changelog-only footprint in this fork", result.stdout);
-}
-
-impl RelevanceFilterTests.test_new_upstream_tool_is_worth_reviewing -> any {
-    self.write("tools/new_workflow.py", "print('new workflow')\n");
-    added: any = self.commit("upstream: add a new workflow tool");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    before: any = git(self.root, "status", "--porcelain");
-
-    result: any = self.run_triage();
-
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**1** worth reviewing", result.stdout);
-    self.assertIn("tools/new_workflow.py", result.stdout);
-    self.assertIn(f"git cherry-pick {added}", result.stdout);
-    self.assertEqual(git(self.root, "status", "--porcelain"), before);
-    self.assertFalse((self.root / "tools/new_workflow.py").exists());
-}
-
-impl RelevanceFilterTests.test_new_file_in_removed_directory_is_skipped -> any {
-    self.write("portals/gone/cli/src/cli.ts", "run()\n");
-    self.commit("shared: add portal");
-    self.write("portals/gone/cli/tests/new.test.ts", "test()\n");
-    self.commit("upstream: add a test to the portal");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    git(self.root, "rm", "-r", "portals/gone");
-    self.commit("fork: remove demo portal");
-
-    result: any = self.run_triage();
-
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**0** worth reviewing", result.stdout);
-    self.assertIn("touches only files not in this fork", result.stdout);
-}
-
-impl RelevanceFilterTests.test_new_directory_inside_kept_directory_is_worth_reviewing -> any {
-    self.write("portals/kept/cli.ts", "run()\n");
-    self.commit("shared: add portal");
-    self.write("portals/kept/tests/new/case.test.ts", "test()\n");
-    added: any = self.commit("upstream: add nested tests to a kept portal");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-
-    result: any = self.run_triage();
-
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**1** worth reviewing", result.stdout);
-    self.assertIn(f"git cherry-pick {added}", result.stdout);
-}
-
-impl RelevanceFilterTests.test_new_tool_with_changelog_is_not_changelog_only -> any {
-    self.write("CHANGELOG.md", "- base\n");
-    self.commit("shared: add changelog");
-    self.write("tools/new_workflow.py", "print('new workflow')\n");
-    self.write("CHANGELOG.md", "- new workflow tool\n");
-    added: any = self.commit("upstream: ship a new tool and changelog");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-
-    result: any = self.run_triage();
-
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**1** worth reviewing", result.stdout);
-    self.assertIn(f"git cherry-pick {added}", result.stdout);
-    self.assertNotIn("changelog-only footprint in this fork", result.stdout);
-}
-
-impl AlreadyAppliedTests.test_cherry_picked_commit_drops_off_via_patch_id -> any {
-    self.write("kept.py", "print('feature')\n");
-    upstream_sha: any = self.commit("upstream: add feature");
-    self.write("shared.txt", "upstream edit\n");
-    self.commit("upstream: unrelated change");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~2");
-    self.write("fork_only.txt", "mine\n");
-    self.commit("fork: divergent commit");
-    git(self.root, "cherry-pick", upstream_sha);
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("already applied (cherry-picked)", result.stdout);
-    self.assertIn("**1** worth reviewing", result.stdout);
-}
-
-impl SubjectCollisionTests.test_different_patch_with_same_subject_requests_verification -> any {
-    self.write("kept.py", "print('upstream fix')\n");
-    upstream_sha: any = self.commit("Fix configuration");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    self.write("shared.txt", "fork configuration\n");
-    fork_sha: any = self.commit("Fix configuration");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**0** worth reviewing", result.stdout);
-    self.assertIn(
-        f"subject matches fork commit {fork_sha[:9]}, patch differs: verify", result.stdout
+impl TriageTests.test_conflict_resolved_personalized_port_has_distinct_verify_reason {
+    profile: str = ".claude/skills/job-application-assistant/01-candidate-profile.md";
+    self.commit("Add template profile", {profile: "Name: template\nGuidance: old\n"});
+    upstream_sha = self.commit(
+        "Improve profile guidance", {profile: "Name: template\nGuidance: improved\n"}
     );
-    self.assertNotIn(f"git cherry-pick {upstream_sha}", result.stdout);
-    self.assertNotIn("already applied (cherry-picked)", result.stdout);
-}
-
-impl SubjectCollisionTests.test_conflict_resolved_personalized_port_has_distinct_verify_reason -> any {
-    profile: any = ".claude/skills/job-application-assistant/01-candidate-profile.md";
-    self.write(profile, "Name: template\nGuidance: old\n");
-    self.commit("Add template profile");
-    self.write(profile, "Name: template\nGuidance: improved\n");
-    upstream_sha: any = self.commit("Improve profile guidance");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    self.write(profile, "Name: personal\nGuidance: old\n");
-    self.commit("Personalize profile");
-    picked: any = subprocess.run(
-        ["git", "cherry-pick", upstream_sha], cwd=self.root, capture_output=True, text=True
+    self.fork_point();
+    self.commit("Personalize profile", {profile: "Name: personal\nGuidance: old\n"});
+    with self.assertRaises(subprocess.CalledProcessError) {
+        self.git("cherry-pick", upstream_sha);
+    }
+    (self.root / profile).write_text("Name: personal\nGuidance: improved\n", encoding="utf-8");
+    self.git("add", profile);
+    self.git("cherry-pick", "--continue");
+    fork_sha = self.git("rev-parse", "HEAD").strip();
+    self.triage(
+        [
+            "**0** worth reviewing",
+            f"subject matches fork commit {fork_sha[:9]}, patch differs: verify",
+        ],
+        [APPLIED],
     );
-    self.assertNotEqual(picked.returncode, 0, "fixture must exercise a real conflict");
-    self.write(profile, "Name: personal\nGuidance: improved\n");
-    git(self.root, "add", profile);
-    git(self.root, "cherry-pick", "--continue");
-    fork_sha: any = git(self.root, "rev-parse", "HEAD").strip();
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**0** worth reviewing", result.stdout);
-    self.assertIn(
-        f"subject matches fork commit {fork_sha[:9]}, patch differs: verify", result.stdout
+}
+
+impl TriageTests.test_same_patch_with_renamed_subject_is_still_already_applied {
+    upstream_sha = self.commit("Fix configuration", {"kept.py": "print('upstream fix')\n"});
+    self.fork_point();
+    self.commit("Fork configuration", {"fork_only.txt": "fork\n"});
+    self.git("cherry-pick", upstream_sha);
+    self.git("commit", "--amend", "-m", "Port upstream configuration fix");
+    self.triage(["**0** worth reviewing", APPLIED]);
+}
+
+impl TriageTests.test_suggested_commands_apply_dependent_changes_in_ancestry_order {
+    final: str = "print('second upstream change')\n";
+    first = self.commit(
+        "Introduce shared behavior", {"kept.py": "print('first upstream change')\n"}
     );
-    self.assertNotIn("already applied (cherry-picked)", result.stdout);
-}
-
-impl SubjectCollisionTests.test_same_patch_with_renamed_subject_is_still_already_applied -> any {
-    self.write("kept.py", "print('upstream fix')\n");
-    upstream_sha: any = self.commit("Fix configuration");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    self.write("fork_only.txt", "fork\n");
-    self.commit("Fork configuration");
-    git(self.root, "cherry-pick", upstream_sha);
-    git(self.root, "commit", "--amend", "-m", "Port upstream configuration fix");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("**0** worth reviewing", result.stdout);
-    self.assertIn("already applied (cherry-picked)", result.stdout);
-}
-
-impl SuggestedCherryPickOrderTests.test_suggested_commands_apply_dependent_changes_in_ancestry_order -> any {
-    self.write("kept.py", "print('first upstream change')\n");
-    first: any = self.commit("Introduce shared behavior");
-    self.write("kept.py", "print('second upstream change')\n");
-    second: any = self.commit("Refine shared behavior");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~2");
-    self.write("fork_only.txt", "fork customization\n");
-    self.commit("Customize fork");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    commands: any = [
+    second = self.commit("Refine shared behavior", {"kept.py": final});
+    self.fork_point(2);
+    self.commit("Customize fork", {"fork_only.txt": "fork customization\n"});
+    commands: list[list[str]] = [
         line.split("  #", 1)[0].split()
-        for line in result.stdout.splitlines()
+        for line in self.triage().splitlines()
         if line.startswith("git cherry-pick ")
     ];
-    self.assertEqual(len(commands), 2, result.stdout);
-    for command in commands {
-        replay: any = subprocess.run(command, cwd=self.root, capture_output=True, text=True);
-        self.assertEqual(replay.returncode, 0, replay.stdout + replay.stderr);
-    }
     self.assertEqual([command[2] for command in commands], [first, second]);
-    self.assertEqual((self.root / "kept.py").read_text(), "print('second upstream change')\n");
+    for command in commands {
+        self.git(*command[1:]);
+    }
+    self.assertEqual((self.root / "kept.py").read_text(), final);
 }
 
-impl WontPortTests.test_listed_sha_is_excluded -> any {
-    self.write("kept.py", "print('rejected feature')\n");
-    rejected: any = self.commit("upstream: feature the fork rejects");
-    self.set_upstream_to_head();
-    git(self.root, "reset", "--hard", "HEAD~1");
-    self.write(".github/upstream-wontport.txt", f"{rejected[:9]}  # rejected on purpose\n");
-    self.commit("fork: won't-port list");
-
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("on the fork's won't-port list", result.stdout);
+impl TriageTests.test_listed_sha_is_excluded {
+    rejected = self.commit(
+        "upstream: feature the fork rejects", {"kept.py": "print('rejected feature')\n"}
+    );
+    self.fork_point();
+    self.commit(
+        "fork: won't-port list",
+        {".github/upstream-wontport.txt": f"{rejected[:9]}  # rejected on purpose\n"},
+    );
+    self.triage(["on the fork's won't-port list"]);
 }
 
-impl MissingUpstreamRefTests.test_missing_ref_degrades_gracefully -> any {
-    result: any = self.run_triage();
-    self.assertEqual(result.returncode, 0, result.stderr);
-    self.assertIn("was not available", result.stdout);
-}
-
-impl WorkflowGuardTests.test_workflow_is_guarded_against_upstream -> any {
-    text: any = WORKFLOW.read_text(encoding="utf-8");
+impl WorkflowGuardTests.test_workflow_is_fork_only_token_scoped_and_sha_pinned {
+    text = WORKFLOW.read_text(encoding="utf-8");
     self.assertIn(f"github.repository != '{UPSTREAM_SLUG}'", text);
-}
-
-impl WorkflowGuardTests.test_workflow_uses_builtin_token_only -> any {
-    text: any = WORKFLOW.read_text(encoding="utf-8");
     self.assertIn("GH_TOKEN: ${{ github.token }}", text);
     self.assertNotIn("secrets.", text);
-}
-
-impl WorkflowGuardTests.test_actions_are_sha_pinned -> any {
-    text: any = WORKFLOW.read_text(encoding="utf-8");
     for line in text.splitlines() {
-        stripped: any = line.strip();
-        if stripped.startswith("- uses:") or stripped.startswith("uses:") {
-            ref: any = stripped.split("uses:", 1)[1].strip();
+        if line.strip().startswith(("- uses:", "uses:")) {
+            ref: str = line.split("uses:", 1)[1].strip();
             self.assertIn("@", ref);
-            sha: any = ref.split("@", 1)[1].split()[0];
-            self.assertRegex(sha, "^[0-9a-f]{40}$", f"action not SHA-pinned: {ref}");
+            self.assertRegex(
+                ref.split("@", 1)[1].split()[0], "^[0-9a-f]{40}$", f"action not SHA-pinned: {ref}"
+            );
         }
     }
 }

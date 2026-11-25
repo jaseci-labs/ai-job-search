@@ -1,31 +1,16 @@
-import builtins;
-
-import operator;
-
 import os;
-
 import subprocess;
-
 import from pathlib { Path }
 
-glob UPSTREAM: any = "ai-job-search-dev/ai-job-search";
+glob UPSTREAM: str = "ai-job-search-dev/ai-job-search",
+     REPO: Path = Path(__file__).resolve().parent.parent,
+     GITHUB_PREFIXES: tuple[str, ...] = (
+         "https://github.com/",
+         "git@github.com:",
+         "ssh://git@github.com/",
+     );
 
-glob REPO: any;
+def _is_upstream_url(url: str) -> bool;
 
-glob _HTTPS_PREFIX: any;
-
-glob _SSH_PREFIX: any;
-
-glob _SSH_URL_PREFIX: any;
-
-with entry {
-    REPO = Path(__file__).resolve().parent.parent;
-
-    _HTTPS_PREFIX = "https://github.com/";
-    _SSH_PREFIX = "git@github.com:";
-    _SSH_URL_PREFIX = "ssh://git@github.com/";
-}
-
-def _is_upstream_url(url: builtins.str) -> builtins.bool;
-
-def is_upstream_checkout -> builtins.bool;
+"""Whether this checkout is the template repository itself; True when that cannot be told."""
+def is_upstream_checkout -> bool;

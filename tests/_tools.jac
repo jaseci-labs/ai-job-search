@@ -7,9 +7,6 @@ import from unittest { mock }
 glob REPO: Path = Path(__file__).resolve().parent.parent;
 
 def app_main -> str;
-
 def tool(name: str) -> list[str];
-
-def rooted(`root: any, env: any = None) -> dict[str, str];
-
-def root_at(fixture: unittest.TestCase, `root: any) -> None;
+def rooted(`root: Path | str, env: any = None) -> dict[str, str];
+def root_at(fixture: unittest.TestCase, `root: Path | str) -> None;
