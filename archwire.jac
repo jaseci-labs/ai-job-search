@@ -24,7 +24,22 @@ graph import {
         save_state,
         tracker_pairs,
     }
-    tests._tools ++> tests.test_apply_records_application { tool }
+    tests._tools ++> tests._specs { tool }
+    tests._specs ++> tests.test_apply_records_application {
+        APPLY,
+        ASSISTANT,
+        GMAIL_SYNC,
+        HTML_REPORT,
+        INTERVIEW,
+        NOTION_SYNC,
+        OUTCOME,
+        SCRAPER,
+        doc,
+        expect,
+        expect_all,
+        lint_skills_passes,
+        section,
+    }
     tests._tools ++> tests.test_check_framework_version { root_at, tool }
     tests._tools ++> tests.test_check_upstream_updates { root_at, tool }
     salary_lookup ++> tests.test_convert_salary_excel { format_entry }
@@ -50,11 +65,46 @@ graph import {
     }
     tests._tools ++> tests.test_job_key { tool }
     tests._tools ++> tests.test_lint_skills { root_at, tool }
-    tests._tools ++> tests.test_notion_sync_command { tool }
-    tests._tools ++> tests.test_outcome_followup { tool }
+    tests._specs ++> tests.test_notion_sync_command {
+        NOTION_SYNC,
+        between,
+        doc,
+        expect,
+        expect_not,
+        lint_skills_passes,
+    }
+    tests._specs ++> tests.test_outcome_followup {
+        OUTCOME,
+        between,
+        doc,
+        expect,
+        lint_skills_passes,
+    }
     tools.page_decode ++> tests.test_page_decode { decode_page, declared_codec }
     tools.posting_guard as posting_guard ++> tests.test_posting_guard;
-    tests._tools ++> tests.test_rank_command { tool }
+    tests._specs ++> tests.test_apply_host_check {
+        APPLY,
+        RANK,
+        REPO,
+        between,
+        doc,
+        expect,
+        expect_not,
+        section,
+    }
+    tests._specs ++> tests.test_rank_command {
+        EVALUATION,
+        RANK,
+        SCRAPER,
+        between,
+        doc,
+        expect,
+        expect_not,
+        expect_re,
+        h2,
+        lint_skills_passes,
+        section,
+    }
     tests._tools ++> tests.test_rank_rounding_cli { tool }
     tools.robots_check as robots_check ++> tests.test_robots_check;
     salary_lookup ++> tests.test_salary_lookup {
@@ -69,6 +119,26 @@ graph import {
     }
     tools.scrape_state as scrape_state ++> tests.test_scrape_state;
     tests._tools ++> tests.test_upskill_skill { tool }
+    tests._specs ++> tests.test_upskill_skill {
+        SCRAPER,
+        between,
+        doc,
+        expect,
+        expect_not,
+        h2,
+        lint_skills_passes,
+    }
+    tests._specs ++> tests.test_company_research_cache {
+        APPLY,
+        EVALUATION,
+        INTERVIEW,
+        doc,
+        expect,
+        expect_re,
+        h2,
+        section,
+    }
+    tests._specs ++> tests.test_outcome_stale { OUTCOME, between, doc, expect }
     tests.test_check_upstream_updates ++> tests.test_upstream_crossrefs {
         UpstreamCheckerRepoFixture,
         FRONTMATTER,
