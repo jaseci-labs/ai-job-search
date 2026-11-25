@@ -8,7 +8,8 @@ import from tempfile { TemporaryDirectory }
 glob TOOL: list[str] = tool("rank_state"),
      TODAY: str = "2026-09-03",
      DIMENSIONS: tuple[str, ...] = ("technical", "experience", "behavioral", "career"),
-     RETRY_FIELDS: tuple[str, ...] = ("fetch_attempts", "first_unreachable", "last_fetch_error");
+     RETRY_FIELDS: tuple[str, ...] = ("fetch_attempts", "first_unreachable", "last_fetch_error"),
+     ABSENT: str = "<absent>";
 
 def job(**over: any) -> dict[str, any];
 

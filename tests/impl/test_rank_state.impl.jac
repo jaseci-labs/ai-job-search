@@ -286,93 +286,62 @@ impl Apply.test_a_result_changes_exactly_the_fields_it_should {
         first_unreachable="2026-09-01T09:00:00Z",
         last_fetch_error="timeout",
     );
-    cases: list[tuple[dict[str, any], dict[str, any], str, dict[str, any], tuple[str, ...]]] = [
-        (
-            job(deadline="2026-10-01"),
-            scored(deadline=None),
-            "ranked",
-            {"deadline": "2026-10-01"},
-            (),
-        ),
-        (job(location="FLAG"), scored(), "ranked", {"location_verdict": "FLAG"}, ("location",)),
+    retry_cleared: dict[str, str] = dict.fromkeys((*RETRY_FIELDS, "expired_reason"), ABSENT);
+    cases: list[tuple[dict[str, any], dict[str, any], dict[str, any]]] = [
+        (job(deadline="2026-10-01"), scored(deadline=None), {"deadline": "2026-10-01"}),
+        (job(location="FLAG"), scored(), {"location_verdict": "FLAG", "location": ABSENT}),
         (
             job(location="Athens, Greece"),
             scored(location_verdict="PASS"),
-            "ranked",
             {"location": "Athens, Greece"},
-            (),
         ),
-        (
-            job(language_note="stale note from a prior run"),
-            scored(language_gate="PASS"),
-            "ranked",
-            {},
-            ("language_note",),
-        ),
+        (job(language_note="stale"), scored(language_gate="PASS"), {"language_note": ABSENT}),
         (
             job(),
             scored(strengths=["one", "two", "three", "four"], gaps=[script]),
-            "ranked",
             {"strengths": ["one", "two", "three"], "gaps": [script]},
-            (),
         ),
         (
             job(status="ranked", strengths=["old strength"], gaps=["old gap"]),
             scored(strengths=["new strength"], gaps=["new gap"]),
-            "ranked",
             {"strengths": ["new strength"], "gaps": ["new gap"]},
-            (),
         ),
         (
             job(status="ranked", rank_score=40, strengths=["old"]),
             scored(score=90, strengths=["new"]),
-            "ranked",
             {"rank_score": 90, "strengths": ["new"]},
-            (),
         ),
-        (retrying, scored(score=60), "ranked", {"status": "ranked"}, RETRY_FIELDS),
-        (job(), closed, "expired", {"status": "expired"}, ()),
-        (retrying, closed, "expired", {"status": "expired"}, (*RETRY_FIELDS, "expired_reason")),
-        (job(), scored(), "ranked", {}, ("guard",)),
+        (retrying, scored(score=60), {"status": "ranked", **retry_cleared}),
+        (job(), closed, {"status": "expired"}),
+        (retrying, closed, {"status": "expired", **retry_cleared}),
+        (job(), scored(), {"guard": ABSENT}),
         (
             job(),
             scored(guard=f"posting_guard: {warning} (1 hidden block removed)"),
-            "ranked",
             {"guard": f"{warning} (1 hidden block removed)"},
-            (),
         ),
-        (job(), scored(guard=f"posting_guard: {warning}"), "ranked", {"guard": warning}, ()),
-        (job(), scored(guard="posting_guard: clean"), "ranked", {"guard": "clean"}, ()),
+        (job(), scored(guard=f"posting_guard: {warning}"), {"guard": warning}),
+        (job(), scored(guard="posting_guard: clean"), {"guard": "clean"}),
         (
             job(),
             scored(guard="posting_guard: clean (8 hidden blocks removed, none instruction-like)"),
-            "ranked",
             {"guard": "clean"},
-            (),
         ),
-        (job(), scored(guard="clean", location_verdict="FAIL"), "vetoed", {"guard": "clean"}, ()),
-        (
-            job(status="ranked", guard="⚠ old", rank_score=50, rank_date="2026-08-01"),
-            scored(),
-            "ranked",
-            {},
-            ("guard",),
-        ),
-        (job(), scored(guard="x" * 500), "ranked", {"guard": "x" * 200}, ()),
-        (job(), scored(guard={"not": "a string"}), "ranked", {}, ("guard",)),
+        (job(status="ranked", guard="⚠ old", rank_score=50), scored(), {"guard": ABSENT}),
+        (job(), scored(guard="x" * 500), {"guard": "x" * 200}),
+        (job(), scored(guard={"not": "a string"}), {"guard": ABSENT}),
     ];
-    for (stored, result, bucket, want, absent) in cases {
+    for (stored, result, want) in cases {
         with self.subTest(stored=stored, result=result) {
             self.write_state({"a": stored});
             out: dict[str, any] = self.apply([result]);
             after: dict[str, any] = self.read_state()["a"];
-            self.assertEqual(keys(out[bucket]), ["a"]);
-            self.assertEqual({field: after.get(field) for field in want}, want);
-            for field in absent {
-                self.assertNotIn(field, after);
-            }
-            if bucket != "expired" {
-                self.assertEqual(out[bucket][0]["guard"], after.get("guard"));
+            self.assertEqual({field: after.get(field, ABSENT) for field in want}, want);
+            if result is closed {
+                self.assertEqual(keys(out["expired"]), ["a"]);
+            } else {
+                self.assertEqual(keys(out["ranked"]), ["a"]);
+                self.assertEqual(out["ranked"][0]["guard"], after.get("guard"));
             }
         }
     }
@@ -487,11 +456,13 @@ impl Apply.test_weights_bands_and_persisted_fields {
 impl Apply.test_vetoed_rows_are_separated_from_the_ranking {
     self.write_state({"a": job(), "b": job(), "c": job()});
     out: dict[str, any] = self.apply([
-        scored("a", 90, location_verdict="FAIL"),
+        scored("a", 90, location_verdict="FAIL", guard="clean"),
         scored("b", 90, language_gate="FAIL", language_note="requires fluent Polish"),
         scored("c", 40),
     ]);
     self.assertEqual(sorted(keys(out["vetoed"])), ["a", "b"]);
+    self.assertEqual([row["guard"] for row in out["vetoed"]], ["clean", None]);
+    self.assertEqual(self.read_state()["a"]["guard"], "clean");
     self.assertEqual(keys(out["ranked"]), ["c"]);
     self.assertEqual(self.read_state()["b"]["language_note"], "requires fluent Polish");
 }
