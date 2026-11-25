@@ -1,32 +1,19 @@
-impl VerificationError.__repr__ -> str {
-    return (getattr(builtins.super(VerificationError, self), "__repr__") as any)();
-}
-
-impl VerificationError.__eq__(other: any) -> bool {
-    return self is other;
-}
-
-impl VerificationError.__hash__ -> int {
-    return id(self);
-}
-
-impl check_dump_target(path, `root=root_default_) -> any {
-    parent: any;
-    path = Path(path);
-    if path.suffix != ".txt" {
+impl check_dump_target(path: str | Path, base: Path = ROOT) -> str | None {
+    target: Path = Path(path);
+    if target.suffix != ".txt" {
         return "must name a .txt file";
     }
-    if path.is_symlink() {
+    if target.is_symlink() {
         return "must not be a symlink";
     }
-    parent = path.resolve().parent;
-    if not `any(parent.is_relative_to((`root / d).resolve()) for d in DUMP_TEXT_DIRS) {
-        return "must be inside this repo's " + " or ".join(f"{d}/" for d in DUMP_TEXT_DIRS);
+    parent: Path = target.resolve().parent;
+    if not any([parent.is_relative_to((base / d).resolve()) for d in DUMP_TEXT_DIRS]) {
+        return "must be inside this repo's " + " or ".join([f"{d}/" for d in DUMP_TEXT_DIRS]);
     }
     return None;
 }
 
-impl run_tool(command) -> any {
+impl run_tool(command: list[str]) -> str {
     try {
         return subprocess.run(
             command, check=True, capture_output=True, text=True, encoding="utf-8", errors="replace"
@@ -36,39 +23,32 @@ impl run_tool(command) -> any {
             f"required command '{command[0]}' was not found. Install pypdf (`neojac install`) or poppler-utils (macOS: brew install poppler, Debian/Ubuntu: apt install poppler-utils, Windows: choco install poppler)",
         ) from exc;
     } except subprocess.CalledProcessError as exc {
-        detail: any = (exc.stderr or "").strip() or (exc.stdout or "").strip();
-        detail = detail or "command failed";
+        detail: str = (exc.stderr or "").strip() or (exc.stdout or "").strip() or "command failed";
         raise VerificationError(f"{command[0]} could not read the PDF: {detail}") from exc;
     }
 }
 
-impl parse_page_count(pdfinfo_output) -> any {
-    `match: any = re.search("^Pages:\\s+(\\d+)\\s*$", pdfinfo_output, re.MULTILINE);
-    if not `match {
+impl parse_page_count(pdfinfo_output: str) -> int {
+    found: any = re.search("^Pages:\\s+(\\d+)\\s*$", pdfinfo_output, re.MULTILINE);
+    if not found {
         raise VerificationError("pdfinfo output did not contain a page count");
     }
-    return `int(`match.group(1));
+    return int(found.group(1));
 }
 
-impl normalize_text(text) -> any {
-    text = unicodedata.normalize("NFC", text).translate(TYPOGRAPHIC_FOLDS);
-    return " ".join(text.split());
+impl normalize_text(text: str) -> str {
+    return " ".join(unicodedata.normalize("NFC", text).translate(TYPOGRAPHIC_FOLDS).split());
 }
 
-impl _bare_number(token) -> any {
-    core: any = token.strip(_OUTER_PUNCTUATION);
-    if not _BARE_NUMBER.fullmatch(core) {
-        return None;
-    }
-    groups: any = re.split("[.,]", core.rstrip("kKmM%"));
-    if len(groups) > 1 and `any(_BARE_YEAR.fullmatch(g) for g in groups) {
-        return None;
-    }
-    return core;
+impl _bare_number(token: str) -> str | None {
+    core: str = token.strip(OUTER_PUNCTUATION);
+    groups: list[str] = re.split("[.,]", core.rstrip("kKmM%"));
+    dated: bool = len(groups) > 1 and any([BARE_YEAR.fullmatch(g) for g in groups]);
+    return core if BARE_NUMBER.fullmatch(core) and not dated else None;
 }
 
-impl _currency_amount(token) -> any {
-    core: any = token.strip(_OUTER_PUNCTUATION);
+impl _currency_amount(token: str) -> str | None {
+    core: str = token.strip(OUTER_PUNCTUATION);
     if core and unicodedata.category(core[0]) == "Sc" {
         core = core[1:];
     } elif core and unicodedata.category(core[-1]) == "Sc" {
@@ -76,132 +56,103 @@ impl _currency_amount(token) -> any {
     } else {
         return None;
     }
-    return core if _BARE_NUMBER.fullmatch(core) else None;
+    return core if BARE_NUMBER.fullmatch(core) else None;
 }
 
-impl _quantity_range(line, dash_index) -> any {
-    before: any = _TOKEN_BEFORE.search(line[:dash_index]);
-    after: any = _TOKEN_AFTER.search(line[dash_index + 1:]);
+impl _quantity_range(line: str, dash_index: int) -> bool {
+    before: any = TOKEN_BEFORE.search(line[:dash_index]);
+    after: any = TOKEN_AFTER.search(line[dash_index + 1:]);
     if not before or not after {
         return False;
     }
-    left_money: any;
-    right_money: any;
-    (left_money, right_money) = (
-        _currency_amount(before.group(1)),
-        _currency_amount(after.group(1)),
-    );
-    left: any;
-    right: any;
-    (left, right) = (
-        left_money or _bare_number(before.group(1)),
-        right_money or _bare_number(after.group(1)),
-    );
-    if left_money is not None or right_money is not None {
-        return left is not None and right is not None;
-    }
+    left_money: str | None = _currency_amount(before.group(1));
+    right_money: str | None = _currency_amount(after.group(1));
+    left: str | None = left_money or _bare_number(before.group(1));
+    right: str | None = right_money or _bare_number(after.group(1));
     if left is None or right is None {
         return False;
     }
-    if _BARE_YEAR.fullmatch(left)
-        and (_BARE_YEAR.fullmatch(right) or _TWO_DIGIT_YEAR.fullmatch(right))
-    {
-        return False;
+    if left_money or right_money {
+        return True;
     }
-    return True;
+    return not (
+        BARE_YEAR.fullmatch(left)
+        and (BARE_YEAR.fullmatch(right) or TWO_DIGIT_YEAR.fullmatch(right))
+    );
 }
 
-impl find_non_ascii_date_ranges(text) -> any {
-    hits: any = [];
-    for `match in NON_ASCII_DATE_RANGE.finditer(text) {
-        dash: any = next(c for c in `match.group(0) if c in NON_ASCII_DASHES);
-        line_start: any = text.rfind("\n", 0, `match.start()) + 1;
-        line_end: any = text.find("\n", `match.end());
-        line_end = line_end if line_end != -1 else len(text);
-        line: any = text[line_start:line_end];
-        if _quantity_range(line, `match.start() + `match.group(0).index(dash) - line_start) {
-            continue;
+impl find_non_ascii_date_ranges(text: str) -> list[tuple[str, str]] {
+    hits: list[tuple[str, str]] = [];
+    for found in NON_ASCII_DATE_RANGE.finditer(text) {
+        span: str = found.group(0);
+        dash: str = [c for c in span if c in NON_ASCII_DASHES][0];
+        line_start: int = text.rfind("\n", 0, found.start()) + 1;
+        line_end: int = text.find("\n", found.end());
+        line: str = text[line_start:] if line_end == -1 else text[line_start:line_end];
+        if not _quantity_range(line, found.start() + span.index(dash) - line_start) {
+            hits.append((" ".join(line.split()), dash));
         }
-        hits.append((" ".join(line.split()), dash));
     }
     return hits;
 }
 
-impl _extract_pypdf(pdf_path) -> any {
+impl _extract_pypdf(pdf_path: Path) -> tuple[str, int] | None {
     try {
         import from pypdf { PdfReader }
     } except ImportError {
         return None;
     }
     try {
-        reader: any = PdfReader(`str(pdf_path));
-        pages: any = len(reader.pages);
-        text: any = "\n".join(page.extract_text() or "" for page in reader.pages);
+        reader: any = PdfReader(str(pdf_path));
+        text: str = "\n".join([page.extract_text() or "" for page in reader.pages]);
+        return (text, len(reader.pages)) if normalize_text(text) else None;
     } except Exception {
         return None;
     }
-    if len(normalize_text(text)) == 0 {
-        return None;
-    }
-    return (text, pages);
 }
 
-impl _extract_pdftotext(pdf_path) -> any {
-    text: any = run_tool(["pdftotext", "-layout", "-enc", "UTF-8", `str(pdf_path), "-"]);
-    pages: any = parse_page_count(run_tool(["pdfinfo", `str(pdf_path)]));
-    return (text, pages);
-}
-
-impl extract_text_layer(pdf_path) -> any {
-    pypdf_result: any = _extract_pypdf(pdf_path);
-    if pypdf_result is not None {
-        text: any;
-        pages: any;
-        (text, pages) = pypdf_result as any;
-        return (text, pages, "pypdf");
+impl extract_text_layer(pdf_path: Path) -> tuple[str, int, str] {
+    found: tuple[str, int] | None = _extract_pypdf(pdf_path);
+    if found is not None {
+        return (found[0], found[1], "pypdf");
     }
-    (text, pages) = _extract_pdftotext(pdf_path) as any;
-    return (text, pages, "pdftotext");
+    text: str = run_tool(["pdftotext", "-layout", "-enc", "UTF-8", str(pdf_path), "-"]);
+    return (text, parse_page_count(run_tool(["pdfinfo", str(pdf_path)])), "pdftotext");
 }
 
 impl verify_pdf(
-    pdf_path, expected_pages=None, min_chars=1, required_text=(), dump_text=None, ascii_dates=False
-) -> any {
-    pdf_path = Path(pdf_path);
-    if not pdf_path.is_file() {
-        raise VerificationError(f"PDF does not exist: {pdf_path}");
+    pdf_path: str | Path,
+    expected_pages: int | None = None,
+    min_chars: int = 1,
+    required_text: any = (),
+    dump_text: str | Path | None = None,
+    ascii_dates: bool = False,
+) -> tuple[str, str, int] {
+    pdf: Path = Path(pdf_path);
+    if not pdf.is_file() {
+        raise VerificationError(f"PDF does not exist: {pdf}");
     }
-
-    extracted_text: any;
-    actual_pages: any;
-    extractor: any;
-    (extracted_text, actual_pages, extractor) = extract_text_layer(pdf_path) as any;
+    (text, pages, extractor) = extract_text_layer(pdf);
     if dump_text is not None {
-        dump_path: any = Path(dump_text);
+        dump_path: Path = Path(dump_text);
         try {
             dump_path.parent.mkdir(parents=True, exist_ok=True);
-            dump_path.write_text(
-                extracted_text if extracted_text.endswith("\n") else extracted_text + "\n",
-                encoding="utf-8",
-            );
+            dump_path.write_text(text if text.endswith("\n") else text + "\n", encoding="utf-8");
         } except OSError as exc {
             raise VerificationError(f"could not write --dump-text to {dump_path}: {exc}") from exc;
         }
     }
-
-    if expected_pages is not None and actual_pages != expected_pages {
+    if expected_pages is not None and pages != expected_pages {
         raise VerificationError(
-            f"expected {expected_pages} page(s), found {actual_pages} (extractor: {extractor})"
+            f"expected {expected_pages} page(s), found {pages} (extractor: {extractor})"
         );
     }
-
-    normalized: any = normalize_text(extracted_text);
+    normalized: str = normalize_text(text);
     if len(normalized) < min_chars {
         raise VerificationError(
             f"text layer has {len(normalized)} character(s); expected at least {min_chars} (extractor: {extractor})",
         );
     }
-
     for required in required_text {
         if normalize_text(required) not in normalized {
             raise VerificationError(
@@ -209,21 +160,18 @@ impl verify_pdf(
             );
         }
     }
-
-    if ascii_dates {
-        hits: any = find_non_ascii_date_ranges(extracted_text);
-        if hits {
-            listed: any = "; ".join(f"U+{ord(dash):04X} in {line[:80]!r}" for (line, dash) in hits);
-            raise VerificationError(
-                f"{len(hits)} date range(s) joined by a non-ASCII dash - an ATS that splits ranges on U+002D drops the date; write the date argument with a single ASCII hyphen (05-cv-templates.md, 'Date fields must be ASCII ranges'): {listed} (extractor: {extractor})",
-            );
-        }
+    hits: list[tuple[str, str]] = find_non_ascii_date_ranges(text) if ascii_dates else [];
+    if hits {
+        listed: str = "; ".join([f"U+{ord(dash):04X} in {line[:80]!r}" for (line, dash) in hits]);
+        raise VerificationError(
+            f"{len(hits)} date range(s) joined by a non-ASCII dash - an ATS that splits ranges on U+002D drops the date; write the date argument with a single ASCII hyphen (05-cv-templates.md, 'Date fields must be ASCII ranges'): {listed} (extractor: {extractor})",
+        );
     }
-    return (extractor, extracted_text, actual_pages);
+    return (extractor, text, pages);
 }
 
-impl build_parser -> any {
-    parser: any = argparse.ArgumentParser(
+impl build_parser -> argparse.ArgumentParser {
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Verify a PDF's page count and ATS-readable text layer."
     );
     parser.add_argument("pdf", type=Path, help="PDF file to verify");
@@ -262,28 +210,23 @@ impl _force_utf8_output -> None {
     }
 }
 
-impl main(argv=None) -> any {
+impl main(argv: list[str] | None = None) -> int {
     _force_utf8_output();
     args: any = build_parser().parse_args(argv);
-    if args.dump_text is not None {
-        reason: any = check_dump_target(args.dump_text);
-        if reason {
-            print(f"Error: --dump-text {args.dump_text}: {reason}", file=sys.stderr);
-            return 1;
-        }
+    reason: str | None = None if args.dump_text is None else check_dump_target(args.dump_text);
+    if reason {
+        print(f"Error: --dump-text {args.dump_text}: {reason}", file=sys.stderr);
+        return 1;
     }
     try {
-        extractor: any;
-        text: any;
-        pages: any;
-        (extractor, text, pages) = verify_pdf(
+        (extractor, _, pages) = verify_pdf(
             args.pdf,
             args.pages,
             args.min_chars,
             args.contains,
             dump_text=args.dump_text,
             ascii_dates=args.ascii_dates,
-        ) as any;
+        );
     } except VerificationError as exc {
         print(f"Error: {args.pdf}: {exc}", file=sys.stderr);
         return 1;

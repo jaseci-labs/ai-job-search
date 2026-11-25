@@ -117,7 +117,6 @@ impl VerifyPdf.setUp {
     self.addCleanup(no_pypdf.stop);
 }
 
-
 impl VerifyPdf.test_accepts {
     cases: list[tuple[str, int, dict[str, any]]] = [
         (
