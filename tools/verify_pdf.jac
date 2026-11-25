@@ -247,7 +247,7 @@ def build_parser -> argparse.ArgumentParser {
     return parser;
 }
 
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure: any = getattr(stream, "reconfigure", None);
         if reconfigure {

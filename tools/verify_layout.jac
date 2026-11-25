@@ -123,8 +123,7 @@ obj Page {
 }
 
 """The first pdftotext on PATH that advertises -bbox, else the first one, else None."""
-@functools.cache
-def find_pdftotext -> str | None {
+def _find_pdftotext -> str | None {
     found: list[str | None] = [shutil.which("pdftotext", path=d) for d in os.get_exec_path()];
     candidates: list[str] = list(dict.fromkeys([c for c in found if c]));
     for candidate in candidates {
@@ -145,6 +144,9 @@ def find_pdftotext -> str | None {
     }
     return candidates[0] if candidates else None;
 }
+
+"""`_find_pdftotext`, worked out once a run."""
+glob find_pdftotext: any = functools.cache(_find_pdftotext);
 
 def parse_pdf(path: Path) -> list[Page] {
     binary: str | None = find_pdftotext();
@@ -310,7 +312,7 @@ def `report(path: Path, pages: list[Page]) -> list[str] {
     return problems + find_orphans(pages);
 }
 
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure: any = getattr(stream, "reconfigure", None);
         if reconfigure {

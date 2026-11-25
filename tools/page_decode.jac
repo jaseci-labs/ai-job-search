@@ -50,6 +50,6 @@ def decode_page(raw: bytes) -> str {
     try {
         return raw.decode("utf-8");
     } except UnicodeDecodeError {
-        return raw.decode(declared_codec(raw) or "utf-8", errors="replace");
+        return raw.decode(declared_codec(raw) or "utf-8", "replace");
     }
 }

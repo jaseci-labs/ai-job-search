@@ -121,7 +121,7 @@ def prior_entries(seen: dict[str, any], portal: str, domain: str) -> int {
     ]);
 }
 
-def check_storable(job: dict[str, any]) -> None {
+def check_storable(job: dict[str, any]) {
     for field in STORED_FIELDS {
         if field not in job {
             raise ValueError(f"job needs {field} before storage");

@@ -246,7 +246,7 @@ def parse_sheet(ws: any) -> list[dict[str, any]] {
     return companies;
 }
 
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         if hasattr(stream, "reconfigure") {
             stream.reconfigure(encoding="utf-8");
@@ -254,7 +254,7 @@ def _force_utf8_output -> None {
     }
 }
 
-def main -> None {
+def main {
     _force_utf8_output();
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Convert salary Excel data to JSON"

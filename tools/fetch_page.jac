@@ -41,8 +41,7 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
      REDIRECTS: tuple[int, ...] = (301, 302, 303, 307, 308);
 
 """Whether the curl on PATH can undo a Content-Encoding."""
-@lru_cache(maxsize=1)
-def _curl_supports_compressed -> bool {
+def _curl_probe -> bool {
     try {
         proc: any = subprocess.run(
             ["curl", "--version"],
@@ -59,6 +58,9 @@ def _curl_supports_compressed -> bool {
     return proc.returncode == 0
         and re.search(features, proc.stdout, re.IGNORECASE | re.MULTILINE) is not None;
 }
+
+"""`_curl_probe`, worked out once a run."""
+glob _curl_supports_compressed: any = lru_cache(maxsize=1)(_curl_probe);
 
 """The argv of one GET without automatic redirects, so the next hop can be gated."""
 def build_curl_argv(url: str, out: Path, headers: Path, timeout: float) -> list[str] {
@@ -134,7 +136,9 @@ def fetch_with_curl(url: str, out: Path, timeout: float) -> tuple[int, str | Non
 
 """Hands a 3xx response back to the caller, which gates the target first."""
 class _NoRedirects(HTTPRedirectHandler) {
-    def redirect_request(*args: any, **kwargs: any) -> None {
+    def redirect_request(
+        req: Request, fp: any, code: int, msg: str, headers: any, newurl: str
+    ) -> Request | None {
         return None;
     }
 }
@@ -204,9 +208,9 @@ def _default_out(url: str) -> Path {
 }
 
 def _inside_repo(path: Path) -> bool {
-    probe: Path = Path.cwd() / path.expanduser();
+    probe: Path = Path(os.getcwd()) / path.expanduser();
     while not probe.exists() and probe.parent != probe {
-        probe = probe.parent;
+        probe = Path(probe.parent);
     }
     for ancestor in (probe, *probe.parents) {
         try {
@@ -276,7 +280,7 @@ def main(argv: list[str] | None = None) -> int {
             if remaining <= 0 {
                 raise TimeoutError("fetch exceeded the time limit");
             }
-            out.parent.mkdir(parents=True, exist_ok=True);
+            Path(out.parent).mkdir(parents=True, exist_ok=True);
             (fd, body_name) = tempfile.mkstemp(
                 dir=out.parent, prefix=".fetch_page.", suffix=".tmp"
             );

@@ -244,7 +244,7 @@ def _own_cli_grant(rel: str) -> set[str] {
     return set();
 }
 
-def check_skill_tool_grants -> None {
+def check_skill_tool_grants {
     skills: list[Path] = sorted(ROOT.glob(".claude/skills/*/SKILL.md"))
         + sorted(ROOT.glob(".agents/skills/*/SKILL.md"));
     commands: list[Path] = sorted((ROOT / ".claude" / "commands").rglob("*.md"));
@@ -314,7 +314,7 @@ def _is_str_list(value: any) -> bool {
     return isinstance(value, list) and all([isinstance(item, str) for item in value]);
 }
 
-def check_permissions -> None {
+def check_permissions {
     try {
         data: any = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"));
     } except (OSError, json.JSONDecodeError) as exc {
@@ -450,7 +450,7 @@ def load_local_negations -> set[str] {
 }
 
 """The local-negations file must never exist on the upstream template itself."""
-def check_local_negations_absent_upstream -> None {
+def check_local_negations_absent_upstream {
     if os.environ.get("GITHUB_REPOSITORY") == UPSTREAM_REPO and LOCAL_NEGATIONS_FILE.exists() {
         errors.append(
             ".github/security-guards-local.txt must not exist on the upstream template: it is a fork-only extension point. Remove it from this PR.",
@@ -458,7 +458,7 @@ def check_local_negations_absent_upstream -> None {
     }
 }
 
-def check_gitignore -> None {
+def check_gitignore {
     try {
         lines: list[str] = _gitignore_lines(ROOT / ".gitignore");
     } except OSError as exc {
@@ -500,7 +500,7 @@ def check_gitignore -> None {
     }
 }
 
-def check_package_manifests -> None {
+def check_package_manifests {
     for manifest in ROOT.glob(".agents/**/package.json") {
         if "node_modules" in manifest.parts {
             continue;
@@ -533,7 +533,7 @@ def check_package_manifests -> None {
             }
         }
         for name in INSTALL_CONFIG_FILES {
-            config: Path = manifest.parent / name;
+            config: Path = Path(manifest.parent) / name;
             if config.exists() {
                 errors.append(
                     f"{config.relative_to(ROOT)}: a {name} beside a portal manifest is forbidden - it reconfigures `bun install` itself (registry, scopes, trusted packages) for every fork user.",
@@ -544,10 +544,10 @@ def check_package_manifests -> None {
 }
 
 """Fail on any tracked path with a `node_modules` component; skipped outside a git checkout."""
-def check_tracked_node_modules -> None {
+def check_tracked_node_modules {
     try {
         proc: any = subprocess.run(
-            ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=False
+            ["git", "ls-files", "-z"], cwd=str(ROOT), capture_output=True, check=False
         );
     } except OSError {
         return;
@@ -555,7 +555,7 @@ def check_tracked_node_modules -> None {
     if proc.returncode != 0 {
         return;
     }
-    for rel in proc.stdout.decode("utf-8", errors="replace").split("\x00") {
+    for rel in proc.stdout.decode("utf-8", "replace").split("\x00") {
         if "node_modules" in rel.split("/") {
             errors.append(
                 f"tracked path inside node_modules: {rel!r}. Installed dependencies (or a symlink standing in for them) must never be committed: run `git rm --cached` on it; .gitignore's `node_modules` rule keeps it out.",
@@ -564,7 +564,7 @@ def check_tracked_node_modules -> None {
     }
 }
 
-def check_agent_tool_grants -> None {
+def check_agent_tool_grants {
     for path in sorted((ROOT / ".claude" / "agents").rglob("*.md")) {
         rel: str = path.relative_to(ROOT).as_posix();
         text: str | None = _read(path, rel);

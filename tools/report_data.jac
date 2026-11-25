@@ -1,7 +1,7 @@
 """Data layer for /html-report: tracker rows, status buckets, outcome.md stages, counts,
 funnel and rates, gathered by load() for tools/html_report.jac to render unchanged."""
 
-import collections, csv, datetime, os, re, sys, unicodedata;
+import collections, csv, datetime, io, os, re, sys, unicodedata;
 import from glob { glob as list_paths }
 
 glob BUCKET: dict[str, str] = {
@@ -129,12 +129,15 @@ def load(path_root: str = ".") -> dict[str, any] {
         sys.exit(f"{path} not found - /apply creates it with the first application");
     }
     try {
-        with open(path, newline="", encoding="utf-8-sig") as fh {
-            reader: any = csv.DictReader(fh);
-            header: list[str] = [h.strip().lower() for h in reader.fieldnames or []];
-            reader.fieldnames = header;
-            rows: list[any] = [*reader];
+        # Read as bytes and decoded, not opened as utf-8-sig text: a native program's open()
+        # does not take that codec. newline="" keeps the line ends as they are, as the open did.
+        with open(path, "rb") as fb {
+            text: str = fb.read().decode("utf-8-sig");
         }
+        reader: any = csv.DictReader(io.StringIO(text, newline=""));
+        header: list[str] = [h.strip().lower() for h in reader.fieldnames or []];
+        reader.fieldnames = header;
+        rows: list[any] = [*reader];
     } except UnicodeDecodeError {
         sys.exit(f"{path} is not UTF-8 text - re-save it as CSV UTF-8");
     }

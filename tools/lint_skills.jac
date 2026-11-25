@@ -29,11 +29,11 @@ with entry {
     }
 }
 
-def fail(path: Path, message: str) -> None {
+def fail(path: Path, message: str) {
     errors.append(f"{path.relative_to(ROOT)}: {message}");
 }
 
-def check_skill(path: Path) -> None {
+def check_skill(path: Path) {
     text: str = path.read_text(encoding="utf-8");
     end: int = text.find("\n---", 4);
     if not text.startswith("---\n") {
@@ -76,7 +76,7 @@ def check_skill(path: Path) -> None {
     }
 }
 
-def check_command(path: Path) -> None {
+def check_command(path: Path) {
     lines: list[str] = path.read_text(encoding="utf-8").lstrip().splitlines();
     first: str = lines[0] if lines else "";
     if not first.startswith("# /") {
@@ -84,7 +84,7 @@ def check_command(path: Path) -> None {
     }
 }
 
-def check_settings -> None {
+def check_settings {
     try {
         data: any = json.loads((ROOT / ".claude" / "settings.json").read_text(encoding="utf-8"));
     } except (OSError, json.JSONDecodeError) as exc {

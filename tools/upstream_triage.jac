@@ -14,7 +14,7 @@ import argparse, shlex, subprocess, sys;
 import from pathlib { Path }
 
 """Use UTF-8 for piped output even on legacy-console hosts."""
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure = getattr(stream, "reconfigure", None);
         if reconfigure {
@@ -225,7 +225,7 @@ def main -> int {
     return 0;
 }
 
-def _print_crossref(remote: str, branch: str) -> None {
+def _print_crossref(remote: str, branch: str) {
     print(
         f"\n_For personalized-file version stamps (which methodology files changed), run `neojac run jobsearch -- check_upstream_updates --remote {shlex.quote(remote)} --branch {shlex.quote(branch)}`._",
     );

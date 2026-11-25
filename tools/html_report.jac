@@ -6,7 +6,7 @@ system fonts and no network requests.
 Usage: neojac run jobsearch -- html_report [--out reports/application-dashboard.html] [--root .]
 """
 
-import argparse, contextlib, datetime, os, sys, tempfile;
+import argparse, datetime, os, sys, tempfile;
 import from html { escape }
 
 glob BLANK: str = "<span class='muted' aria-label='empty'>—</span>",
@@ -295,16 +295,16 @@ def main {
     html: str = render(data);
     out_dir: str = os.path.dirname(os.path.abspath(a.out));
     os.makedirs(out_dir, exist_ok=True);
-    (fd, tmp) = tempfile.mkstemp(suffix=".html", dir=out_dir) as any;
+    (fd, tmp) = tempfile.mkstemp(suffix=".html", dir=out_dir);
     try {
-        with os.fdopen(fd, "w", encoding="utf-8") as f {
+        with open(fd, "w", encoding="utf-8") as f {
             f.write(html);
         }
         os.replace(tmp, a.out);
     } except BaseException {
-        with contextlib.suppress(FileNotFoundError) {
+        try {
             os.unlink(tmp);
-        }
+        } except FileNotFoundError {}
         raise;
     }
     c: any = data["counts"];

@@ -55,7 +55,7 @@ def parse_semver(version_str: str) -> tuple[int, int, int] {
 }
 
 """Use UTF-8 for piped output even on legacy-console hosts."""
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure = getattr(stream, "reconfigure", None);
         if reconfigure {

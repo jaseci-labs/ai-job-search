@@ -1,15 +1,25 @@
-import os, subprocess, sys, unittest;
+import os, subprocess, unittest;
 import from pathlib { Path }
 import from unittest { mock }
 
 glob REPO: Path = Path(__file__).resolve().parent.parent;
 
-def app_main -> str {
-    return str(Path(sys.modules["_jac"].__file__).resolve().parent / "__main__.py");
+"""The native jobsearch program `neojac build jobsearch` made: `dist/jobsearch-<platform>`, a
+file, or the program of that name in a directory of that name when it carries an interpreter."""
+def jobsearch_program -> str {
+    for made in sorted((REPO / "dist").glob("jobsearch-*")) {
+        program: Path = made / "jobsearch" if made.is_dir() else made;
+        if program.is_file() {
+            return str(program);
+        }
+    }
+    raise FileNotFoundError(
+        f"no jobsearch program under {REPO / 'dist'}: run `neojac build jobsearch`"
+    );
 }
 
 def tool(name: str) -> list[str] {
-    return [sys.executable, app_main(), name];
+    return [jobsearch_program(), name];
 }
 
 def rooted(`root: Path | str, env: any = None) -> dict[str, str] {

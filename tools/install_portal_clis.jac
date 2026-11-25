@@ -27,7 +27,10 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
 
 """Each portal CLI directory, sorted by portal name."""
 def discover(base: Path = ROOT) -> list[Path] {
-    return sorted([p.parent for p in (base / ".agents" / "skills").glob("*/cli/package.json")]);
+    return sorted([
+        Path(p.parent)
+        for p in (base / ".agents" / "skills").glob("*/cli/package.json")
+    ]);
 }
 
 """Why this manifest must not be installed unattended, or None when it is safe."""

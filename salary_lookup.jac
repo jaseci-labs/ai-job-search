@@ -12,7 +12,6 @@ Usage:
 
 import argparse, json, math, os, re, sys, unicodedata;
 import from pathlib { Path }
-import from types { NoneType }
 
 glob DATA_FILE: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).parent)
          / "salary_data.json",
@@ -37,7 +36,7 @@ glob DATA_FILE: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).p
      ENTRY_KEYS: set[str] = {"company", "city", "categories"},
      SETUP_HINT: str = "See tools/README_SALARY_TOOL.md for the expected format.";
 
-def fail_data_error(message: str) -> None {
+def fail_data_error(message: str) {
     print(f"Error: invalid salary_data.json: {message}\n\n{SETUP_HINT}", file=sys.stderr);
     sys.exit(1);
 }
@@ -88,11 +87,11 @@ def collect_validation_issues(data: any) -> tuple[list[str], list[str]] {
         } else {
             seen[name.lower()] = i;
         }
-        if not isinstance(company.get("city"), (str, NoneType)) {
+        if not (company.get("city") is None or isinstance(company.get("city"), str)) {
             errors.append(f"{at}.city must be a string when provided");
         }
         categories: any = company.get("categories");
-        if not isinstance(categories, (dict, NoneType)) {
+        if not (categories is None or isinstance(categories, dict)) {
             errors.append(f"{at}.categories must be an object when provided");
             continue;
         }
@@ -103,12 +102,13 @@ def collect_validation_issues(data: any) -> tuple[list[str], list[str]] {
                 );
                 continue;
             }
-            for (field, allowed, wanted) in (
-                ("count", (int, float, NoneType), "a number"),
-                ("index", (int, float, str, NoneType), "a number or string"),
-            ) {
+            for (field, wanted) in (("count", "a number"), ("index", "a number or string")) {
                 value: any = cat.get(field);
-                if not isinstance(value, allowed) {
+                if not (
+                    value is None
+                    or isinstance(value, (int, float))
+                    or (field == "index" and isinstance(value, str))
+                ) {
                     errors.append(
                         f"{at}.categories.{label}.{field} must be {wanted} (got {type(value).__name__})",
                     );
@@ -128,6 +128,16 @@ def validate_data(data: any) -> any {
     return data;
 }
 
+"""A JSON integer as an int, or as a float when it is past the 64 bits a native int holds (an
+infinity, which validation refuses as CPython's refusal of the huge int does)."""
+def _json_int(text: str) -> any {
+    try {
+        return int(text);
+    } except OverflowError {
+        return float(text);
+    }
+}
+
 def read_raw_data -> any {
     if not DATA_FILE.exists() {
         print(
@@ -137,7 +147,10 @@ def read_raw_data -> any {
         sys.exit(1);
     }
     try {
-        return json.loads(DATA_FILE.read_text(encoding="utf-8-sig"));
+        # read_text's decoding and newline translation, from bytes: a native program's open()
+        # does not take the utf-8-sig codec.
+        text: str = DATA_FILE.read_bytes().decode("utf-8-sig");
+        return json.loads(text.replace("\r\n", "\n").replace("\r", "\n"), parse_int=_json_int);
     } except json.JSONDecodeError as exc {
         fail_data_error(f"invalid JSON at line {exc.lineno}, column {exc.colno}: {exc.msg}");
     }
@@ -328,7 +341,7 @@ def print_validation_report(errors: list[str], warnings: list[str]) -> int {
     return 1 if errors else 0;
 }
 
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         if hasattr(stream, "reconfigure") {
             stream.reconfigure(encoding="utf-8");
@@ -336,7 +349,7 @@ def _force_utf8_output -> None {
     }
 }
 
-def main -> None {
+def main {
     _force_utf8_output();
     parser: argparse.ArgumentParser = argparse.ArgumentParser(
         description="Salary Benchmark Lookup"

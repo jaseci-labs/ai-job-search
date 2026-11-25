@@ -14,7 +14,7 @@ Every subcommand prints JSON on stdout. Exit 0 on success, 1 on a usage or state
 `apply` when any result could not be written.
 """
 
-import argparse, csv, json, os, re, sys, tempfile, unicodedata;
+import argparse, csv, io, json, os, re, sys, tempfile, unicodedata;
 import from datetime { date, datetime, timedelta, timezone }
 import from fractions { Fraction }
 import from pathlib { Path }
@@ -68,7 +68,7 @@ def load_state(path: Path) -> tuple[dict[str, any], dict[str, any]] {
 }
 
 """Replace the state file atomically."""
-def save_state(path: Path, doc: dict[str, any]) -> None {
+def save_state(path: Path, doc: dict[str, any]) {
     (fd, tmp) = tempfile.mkstemp(dir=str(path.parent), prefix=".seen_jobs.", suffix=".tmp");
     try {
         with os.fdopen(fd, "w", encoding="utf-8") as fh {
@@ -131,12 +131,12 @@ def tracker_pairs(path: Path) -> set[tuple[str, str]] {
         return pairs;
     }
     try {
-        with path.open(encoding="utf-8-sig", newline="") as fh {
-            for row in csv.DictReader(fh) {
-                company: str = norm(row.get("company"));
-                if company {
-                    pairs.add((company, norm(row.get("role"))));
-                }
+        # Decoded from bytes: a native program's open() does not take the utf-8-sig codec.
+        text: str = path.read_bytes().decode("utf-8-sig");
+        for row in csv.DictReader(io.StringIO(text, newline="")) {
+            company: str = norm(row.get("company"));
+            if company {
+                pairs.add((company, norm(row.get("role"))));
             }
         }
     } except UnicodeDecodeError {
@@ -152,7 +152,7 @@ def brief(
     return {"key": key, **{field: job.get(field) for field in fields}};
 }
 
-def emit(payload: dict[str, any]) -> None {
+def emit(payload: dict[str, any]) {
     print(json.dumps(payload, indent=2, ensure_ascii=False));
 }
 
@@ -237,6 +237,16 @@ def cmd_sweep(args: any) -> int {
         "written": written,
     });
     return 0;
+}
+
+"""A JSON integer as an int, or as a float when it is past the 64 bits a native int holds (an
+infinity, which validation refuses as CPython's refusal of the huge int does)."""
+def _json_int(text: str) -> any {
+    try {
+        return int(text);
+    } except OverflowError {
+        return float(text);
+    }
 }
 
 def overall_score(scores: any) -> int {
@@ -416,7 +426,9 @@ def apply_result(
 def cmd_apply(args: any) -> int {
     (doc, seen) = load_state(args.state);
     try {
-        results: any = json.loads(Path(args.results).read_text(encoding="utf-8"));
+        results: any = json.loads(
+            Path(args.results).read_text(encoding="utf-8"), parse_int=_json_int
+        );
     } except (OSError, json.JSONDecodeError) as exc {
         sys.exit(f"cannot read results file {args.results}: {exc}");
     }
@@ -457,7 +469,7 @@ def cmd_apply(args: any) -> int {
 }
 
 """Write UTF-8 whatever the host's default encoding is."""
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure: any = getattr(stream, "reconfigure", None);
         if reconfigure {

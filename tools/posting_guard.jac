@@ -130,13 +130,13 @@ glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolv
 def _inside_repo(path: Path) -> bool {
     probe: Path = path.expanduser();
     if not probe.is_absolute() {
-        probe = Path.cwd() / probe;
+        probe = Path(os.getcwd()) / probe;
     }
     while not probe.exists() {
         if probe.parent == probe {
             return False;
         }
-        probe = probe.parent;
+        probe = Path(probe.parent);
     }
     for ancestor in (probe, *probe.parents) {
         try {
@@ -166,7 +166,7 @@ def _selector_text(run: str) -> str {
         ord(c) - 0xFE00 if ord(c) <= 0xFE0F else ord(c) - 0xE0100 + 16
         for c in run
     ]);
-    return "".join([c for c in data.decode("utf-8", errors="replace") if c.isprintable()]);
+    return "".join([c for c in data.decode("utf-8", "replace") if c.isprintable()]);
 }
 
 """Text without invisible characters, with their counts, the tampering count and what they spelled."""
@@ -250,11 +250,11 @@ def clean_html(markup: str) -> tuple[str, dict[str, any]] {
         return " ";
     }
 
-    def emit(text: str) -> None {
+    def emit(text: str) {
         (visible if hidden_at is None else hidden_buf).append(text);
     }
 
-    def flush_hidden -> None {
+    def flush_hidden {
         block: str = _fold(html.unescape("".join(hidden_buf)));
         hidden_buf.clear();
         hidden_at = None;
@@ -264,7 +264,7 @@ def clean_html(markup: str) -> tuple[str, dict[str, any]] {
         }
     }
 
-    def pop_to(index: int) -> None {
+    def pop_to(index: int) {
         del stack[index:];
         nav_at = {i for i in nav_at if i < index};
         if hidden_at is not None and hidden_at >= len(stack) {
@@ -444,7 +444,7 @@ def _plain_findings(findings: dict[str, any]) -> str {
     ]);
 }
 
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure: any = getattr(stream, "reconfigure", None);
         if reconfigure {
@@ -459,7 +459,7 @@ def _read_input(path: Path | None, mode: str) -> str {
         return sys.stdin.read();
     }
     data: bytes = buffer.read() if path is None else path.read_bytes();
-    return decode_page(data) if mode == "html" else data.decode("utf-8", errors="replace");
+    return decode_page(data) if mode == "html" else data.decode("utf-8", "replace");
 }
 
 def main(argv: list[str] | None = None) -> int {

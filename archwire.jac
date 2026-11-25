@@ -3,12 +3,37 @@ graph layers {
 }
 
 graph spaces {
-    space jobsearch: cpython { entry cli; salary_lookup | tests | tests.* | tools.*; }
+    """The tools, compiled to machine code: a run starts CPython only for a tool that loads a PyPI package."""
+    space jobsearch: native { entry cli; }
+    """The test suite, which imports the tools as CPython modules and runs them as the jobsearch program."""
+    space tests: cpython { entry tests._run; tests | tests.*; }
+
+    """lint_skills, convert_salary_excel and verify_pdf, which load PyPI packages; jobsearch runs them as this app."""
+    space pytools: cpython { entry pycli; }
 
     app jobsearch { run jobsearch; }
+    app pytools { run pytools; }
+    app tests { run tests; }
 }
 
 graph import {
+    tools.check_framework_version as check_framework_version ++> cli;
+    tools.check_upstream_updates as check_upstream_updates ++> cli;
+    tools.convert_salary_excel as convert_salary_excel ++> pycli;
+    tools.fetch_page as fetch_page ++> cli;
+    tools.html_report as html_report ++> cli;
+    tools.install_portal_clis as install_portal_clis ++> cli;
+    tools.job_key as job_key ++> cli;
+    tools.lint_skills as lint_skills ++> pycli;
+    tools.posting_guard as posting_guard ++> cli;
+    tools.rank_state as rank_state ++> cli;
+    tools.robots_check as robots_check ++> cli;
+    tools.scrape_state as scrape_state ++> cli;
+    tools.security_guards as security_guards ++> cli;
+    tools.upstream_triage as upstream_triage ++> cli;
+    tools.verify_layout as verify_layout ++> cli;
+    tools.verify_pdf as verify_pdf ++> pycli;
+    salary_lookup as salary_lookup ++> cli;
     tools.page_decode ++> tools.fetch_page { decode_page }
     tools.robots_check ++> tools.fetch_page { BROWSER, _force_utf8_output, gate }
     tools.report_data ++> tools.html_report { STAGES, STATUS_ORDER, load, when }

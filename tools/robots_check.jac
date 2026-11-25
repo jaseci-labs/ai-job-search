@@ -207,7 +207,7 @@ def gate(url: str) -> tuple[int, str] {
 }
 
 """Write UTF-8 whatever the host's default encoding is (a piped stdout on Windows is ANSI)."""
-def _force_utf8_output -> None {
+def _force_utf8_output {
     for stream in (sys.stdout, sys.stderr) {
         reconfigure: any = getattr(stream, "reconfigure", None);
         if reconfigure {
