@@ -1,33 +1,21 @@
-import http.server;
-
 import contextlib;
-
+import http.server;
 import io;
-
-import from pathlib { Path }
-
-import sys;
-
-import from unittest.mock { patch }
-
-import from tempfile { TemporaryDirectory }
-
+import shutil;
 import threading;
-
 import unittest;
-
 import zlib;
+import from pathlib { Path }
+import from tempfile { TemporaryDirectory }
+import from unittest { mock }
 
-glob PAGE: any;
+glob PAGE: bytes = b"<html><body><h1>Software Engineer</h1><p>Posting details.</p></body></html>";
 
-with entry {
-    PAGE = b"<html><body><h1>Software Engineer</h1><p>Posting details.</p></body></html>";
+class _Handler(http.server.BaseHTTPRequestHandler) {
+    def do_GET -> None;
+    def log_message(*args: any) -> None;
 }
 
 class DeflateBackend(unittest.TestCase) {
-    def test_standard_and_legacy_deflate_reach_saved_html_and_text -> any;
-}
-
-with entry:__main__ {
-    unittest.main();
+    def test_standard_and_legacy_deflate_reach_saved_html_and_text;
 }
