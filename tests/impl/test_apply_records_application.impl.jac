@@ -1,269 +1,117 @@
-impl section(path, heading) -> any {
-    text: any = path.read_text(encoding="utf-8");
-    start: any = text.index(heading) + len(heading);
-    rest: any = text[start:];
-    end: any = re.search("^#{1,4} ", rest, re.MULTILINE);
-    return rest[:end.start()] if end else rest;
+impl derive(company: str, role: str) -> str | None {
+    name: str = re.sub("[^\\w]", "", f"{company}_{role}".lower().replace(" ", "_"));
+    return re.sub("_+", "_", name).strip("_") or None;
 }
 
-impl ApplyRecordsApplication.setUp -> any {
-    self.step_6b = section(APPLY, "### Step 6b: Record the Application");
-}
-
-impl ApplyRecordsApplication.test_step_writes_a_drafted_row_with_both_document_paths -> any {
-    for fragment in (
-        "| `status` | `drafted` |",
-        "| `cv_file`, `cover_letter_file` | the two paths listed under \"Files Created\"",
-    ) {
-        self.assertIn(
-            fragment,
-            self.step_6b,
-            f"Step 6b's column table lost {fragment!r} - the row it writes would no longer identify itself as a draft or point at the documents",
-        );
-    }
-}
-
-impl ApplyRecordsApplication.test_tracker_header_matches_outcome -> any {
-    self.assertIn(TRACKER_HEADER, OUTCOME.read_text(encoding="utf-8"));
-    self.assertIn(
-        TRACKER_HEADER,
-        self.step_6b,
-        "Step 6b's header drifted from outcome.md's - whichever command ran first would decide the schema",
+impl cv_glob(rel: str, heading: str) -> str {
+    found: list[str] = re.findall(
+        "`(cv/main_[^`]+|cover_letters/cover_[^`]+)`", section(doc(rel), heading)
     );
-    for (name, text) in (
-        ("outcome.md", OUTCOME.read_text(encoding="utf-8")),
-        ("apply.md Step 6b", self.step_6b),
-    ) {
-        header: any = next(
-            (ln.strip() for ln in text.splitlines() if ln.strip().startswith("date,company,")), None
-        );
-        self.assertEqual(
-            header,
-            TRACKER_HEADER,
-            f"{name}'s header line is not exactly the canonical header - a column appended to one file and not the other leaves both containing the shorter header as a substring, which assertIn alone cannot catch",
-        );
-    }
+    return [g for g in found if "*" in g and g.startswith("cv/")][0];
 }
 
-impl ApplyRecordsApplication.test_tracker_header_ends_with_deadline -> any {
-    self.assertTrue(
-        TRACKER_HEADER.endswith(",deadline"),
-        "deadline must be the last column - a mid-header insert shifts every existing row's values by one position",
+impl resolve(pattern: str, role: str) -> str {
+    return pattern.replace("<company>_<role>", derive(COMPANY, role) or "").replace(
+        "<company>", (derive(COMPANY, "") or "").rstrip("_")
     );
 }
 
-impl ApplyRecordsApplication.test_migration_appends_the_headers_own_last_column -> any {
-    last_column: any = TRACKER_HEADER.rsplit(",", 1)[1];
-    outcome_step_1: any = section(OUTCOME, "## Step 1: Load State and Identify the Application");
-    for (name, text) in (
-        ("apply.md Step 6b", section(APPLY, "### Step 6b: Record the Application")),
-        ("outcome.md Step 1", outcome_step_1),
-    ) {
-        self.assertIn(
-            f"append `,{last_column}` to the header line",
-            text,
-            f"{name}'s migration does not append the header's own last column ({last_column!r}) - a tracker migrated by this command would not match one this command creates from scratch",
-        );
-    }
+impl drafted_files(ext: str = ".tex") -> list[str] {
+    return [f"cv/main_{derive(COMPANY, r)}{ext}" for r in ROLES];
 }
 
-impl ApplyRecordsApplication.test_step_runs_before_the_optional_offer_that_ends_the_turn -> any {
-    text: any = APPLY.read_text(encoding="utf-8");
-    self.assertLess(
-        text.index("### Step 6b: Record the Application"),
-        text.index("### Application-Form Fields"),
-        "Step 6b moved after the optional-artifact offer, which ends the turn on a question - the tracker row would be skipped whenever the user never answers",
-    );
-}
-
-impl ApplyRecordsApplication.test_matched_row_is_never_moved_backwards -> any {
-    self.assertIn(
-        "never move it backwards",
-        self.step_6b,
-        "Step 6b lost the rule protecting a submitted row - re-running /apply to refresh a CV would reset a live interview back to drafted",
-    );
-}
-
-impl ApplyRecordsApplication.test_redraft_marker_is_undated -> any {
-    self.assertIn(
-        "undated `redrafted` marker",
-        self.step_6b,
-        "a dated redraft marker resets /outcome's days-quiet clock, hiding a genuinely quiet application from the follow-up offer",
-    );
-}
-
-impl ApplyRecordsApplication.test_seen_jobs_is_left_alone -> any {
-    self.assertIn(
-        "Do not modify `job_scraper/seen_jobs.json`",
-        self.step_6b,
-        "drafting is not applying, and that file has no honest value for either",
-    );
-}
-
-impl ApplyRecordsApplication.test_skill_defers_to_apply_rather_than_restating -> any {
-    step_3b: any = section(SKILL, "### Step 3b: Record the Application");
-    self.assertIn(
-        "`/apply` Step 6b",
-        step_3b,
-        "the skill's recording step no longer points at the canonical rule, so the two copies can drift",
-    );
-}
-
-impl DraftedMeansDraftedToEveryReader.test_every_reader_handles_drafted -> any {
-    for (path, heading, needle, why) in self.CASES {
-        with self.subTest(file=path.name, rule=needle) {
-            haystack: any = section(path, heading) if heading else path.read_text(encoding="utf-8");
-            self.assertIn(needle, haystack, why);
+impl ApplyRecordsApplication.test_every_file_states_its_rules {
+    for (theme, cases) in RULES.items() {
+        with self.subTest(theme=theme) {
+            expect_all(self, cases);
         }
     }
 }
 
-impl DraftedMeansDraftedToEveryReader.test_lint_skills_passes -> any {
-    result: any = subprocess.run([*tool("lint_skills")], cwd=REPO, capture_output=True, text=True);
-    self.assertEqual(
-        result.returncode, 0, f"lint_skills.jac failed:\n{result.stdout}{result.stderr}"
-    );
-}
-
-impl ApplyArchivesThePosting.test_posting_is_archived_where_every_reader_looks -> any {
-    for (path, heading, needle, why) in self.CASES {
-        with self.subTest(file=path.name, rule=needle) {
-            self.assertIn(needle, section(path, heading), why);
-        }
+impl ApplyRecordsApplication.test_tracker_header_is_the_same_line_in_both_commands_and_ends_with_deadline {
+    self.assertTrue(TRACKER_HEADER.endswith(",deadline"));
+    for text in (doc(OUTCOME), section(doc(APPLY), STEP_6B)) {
+        headers: list[str] = [
+            ln.strip()
+            for ln in text.splitlines()
+            if ln.strip().startswith("date,company,")
+        ];
+        self.assertEqual(headers[:1], [TRACKER_HEADER]);
     }
 }
 
-impl DeadlineSurvivesEveryWrite.test_deadline_survives_every_write -> any {
-    for (path, heading, needle, why) in self.CASES {
-        with self.subTest(file=path.name, rule=needle) {
-            haystack: any = section(path, heading) if heading else path.read_text(encoding="utf-8");
-            self.assertIn(needle, haystack, why);
-        }
+impl ApplyRecordsApplication.test_migration_appends_the_headers_own_last_column {
+    last_column: str = TRACKER_HEADER.rsplit(",", 1)[1];
+    for (rel, heading) in ((APPLY, STEP_6B), (OUTCOME, OUTCOME_1)) {
+        expect(self, section(doc(rel), heading), f"append `,{last_column}` to the header line");
     }
 }
 
-impl FallbackGlobFindsOneRolesDocuments.test_both_readers_glob_the_full_stem -> any {
-    for (path, heading, needle, why) in self.CASES {
-        with self.subTest(file=path.name, rule=needle) {
-            self.assertIn(needle, section(path, heading), why);
-        }
-    }
+impl ApplyRecordsApplication.test_step_runs_before_the_optional_offer_that_ends_the_turn {
+    text: str = doc(APPLY);
+    self.assertLess(text.index(STEP_6B), text.index("### Application-Form Fields"));
 }
 
-impl FallbackGlobFindsOneRolesDocuments.globs(path, heading) -> any {
-    body: any = section(path, heading);
-    found: any = re.findall("`(cv/main_[^`]+|cover_letters/cover_[^`]+)`", body);
-    return [g for g in found if "*" in g];
+impl ApplyRecordsApplication.test_lint_skills_passes {
+    lint_skills_passes(self);
 }
 
-impl FallbackGlobFindsOneRolesDocuments.resolve(`glob, role) -> any {
-    stem: any = ArchiveNameIsOnePathComponent.derive(self.COMPANY, role);
-    company: any = ArchiveNameIsOnePathComponent.derive(self.COMPANY, "").rstrip("_");
-    return `glob.replace("<company>_<role>", stem).replace("<company>", company);
-}
-
-impl FallbackGlobFindsOneRolesDocuments.drafted_files(ext=".tex") -> any {
-    return [
-        "cv/main_%s%s" % (ArchiveNameIsOnePathComponent.derive(self.COMPANY, r), ext)
-        for r in self.ROLES
-    ];
-}
-
-impl FallbackGlobFindsOneRolesDocuments.test_the_cv_glob_selects_the_row_s_own_role -> any {
-    on_disk: any = self.drafted_files();
-    for (path, heading) in (
-        (OUTCOME, "## Step 3: Archive the Application Materials"),
-        (INTERVIEW, "## Step 1: Load the Application Context"),
-    ) {
-        cv_glob: any = next(g for g in self.globs(path, heading) if g.startswith("cv/"));
-        for (role, expected) in zip(self.ROLES, on_disk) {
-            with self.subTest(file=path.name, role=role) {
-                hits: any = fnmatch.filter(on_disk, self.resolve(cv_glob, role));
-                self.assertEqual(
-                    hits,
-                    [expected],
-                    "%s's fallback glob %r matched %r for role %r. A glob that matches both roles hands /outcome whichever the filesystem returns first, and it archives that as what was submitted."
-                        % (path.name, cv_glob, hits, role),
-                );
+impl ApplyRecordsApplication.test_the_cv_glob_selects_the_row_s_own_role {
+    on_disk: list[str] = drafted_files();
+    for (rel, heading) in ((OUTCOME, OUTCOME_3), (INTERVIEW, INTERVIEW_1)) {
+        pattern: str = cv_glob(rel, heading);
+        for (role, expected) in zip(ROLES, on_disk) {
+            with self.subTest(file=rel, role=role) {
+                self.assertEqual(fnmatch.filter(on_disk, resolve(pattern, role)), [expected]);
             }
         }
     }
 }
 
-impl FallbackGlobFindsOneRolesDocuments.test_archiving_keeps_each_submitted_sources_extension_and_bytes -> any {
-    body: any = section(OUTCOME, "## Step 3: Archive the Application Materials");
-    destinations: any = re.search("\\*\\*`(cv_draft[^`]+)` and `(cover_letter[^`]+)`\\*\\*", body);
-    self.assertIsNotNone(destinations, "the archive must name both destination sources");
-    for (extension, content) in (
+impl ApplyRecordsApplication.test_the_glob_finds_a_non_tex_template {
+    on_disk: list[str] = drafted_files(".typ");
+    pattern: str = resolve(cv_glob(OUTCOME, OUTCOME_3), ROLES[0]);
+    self.assertEqual(fnmatch.filter(on_disk, pattern), [on_disk[0]]);
+}
+
+impl ApplyRecordsApplication.test_archiving_keeps_each_submitted_sources_extension_and_bytes {
+    targets: re.Match | None = re.search(
+        "\\*\\*`(cv_draft[^`]+)` and `(cover_letter[^`]+)`\\*\\*", section(doc(OUTCOME), OUTCOME_3)
+    );
+    assert targets is not None, "the archive must name both destination sources";
+    for (ext, content) in (
         (".tex", b"\\documentclass{article}\n"),
         (".typ", b"#set text(size: 11pt)\n"),
     ) {
         for (directory, stem, target) in (
-            ("cv", "main", destinations.group(1)),
-            ("cover_letters", "cover", destinations.group(2)),
+            ("cv", "main", targets.group(1)),
+            ("cover_letters", "cover", targets.group(2)),
         ) {
-            tmp: any;
-            with self.subTest(
-                extension=extension, document=directory
-            ), tempfile.TemporaryDirectory() as tmp {
-                `root: any = Path(tmp);
-                source: any = `root / directory / (stem + "_acme_ml-engineer" + extension);
+            with self.subTest(ext=ext, document=directory), tempfile.TemporaryDirectory() as tmp {
+                source: Path = Path(tmp) / directory / f"{stem}_acme_ml-engineer{ext}";
                 source.parent.mkdir();
                 source.write_bytes(content);
-                destination: any = `root
-                    / target.replace("<CV_EXT>", extension).replace("<COVER_EXT>", extension);
+                destination: Path = Path(tmp)
+                    / target.replace("<CV_EXT>", ext).replace("<COVER_EXT>", ext);
                 shutil.copyfile(source, destination);
-                self.assertEqual(
-                    destination.suffix,
-                    source.suffix,
-                    "archiving must preserve the submitted template's actual format",
-                );
-                self.assertEqual(destination.read_bytes(), source.read_bytes());
+                self.assertEqual(destination.suffix, source.suffix);
+                self.assertEqual(destination.read_bytes(), content);
             }
         }
     }
 }
 
-impl FallbackGlobFindsOneRolesDocuments.test_the_glob_finds_a_non_tex_template -> any {
-    on_disk: any = self.drafted_files(ext=".typ");
-    cv_glob: any = next(
-        g
-        for g in self.globs(OUTCOME, "## Step 3: Archive the Application Materials")
-        if g.startswith("cv/"),
-    );
-    hits: any = fnmatch.filter(on_disk, self.resolve(cv_glob, self.ROLES[0]));
-    self.assertEqual(
-        hits,
-        [on_disk[0]],
-        "the fallback hardcodes an extension, so a template registered by /add-template is invisible to it and /outcome archives nothing",
-    );
-}
-
-impl ArchiveNameIsOnePathComponent.test_the_rule_has_one_home_and_every_deriver_cites_it -> any {
-    for (path, heading, needle, why) in self.CASES {
-        with self.subTest(file=path.name, rule=needle) {
-            self.assertIn(needle, section(path, heading), why);
-        }
-    }
-}
-
-impl ArchiveNameIsOnePathComponent.derive(company, role) -> any {
-    name: any = f"{company}_{role}".lower().replace(" ", "_");
-    name = re.sub("[^\\w]", "", name);
-    name = re.sub("_+", "_", name).strip("_");
-    return name or None;
-}
-
-impl ArchiveNameIsOnePathComponent.test_documented_rule_yields_a_single_path_component -> any {
-    for (company, role, expected) in self.DERIVATIONS {
+impl ApplyRecordsApplication.test_documented_rule_yields_a_single_path_component {
+    cases: list[tuple[str, str, str | None]] = [
+        ("Novo Nordisk A/S", "Data Scientist", "novo_nordisk_as_data_scientist"),
+        ("Acme", "Data Scientist / ML Engineer", "acme_data_scientist_ml_engineer"),
+        ("Ørsted A/S", "ML Engineer", "ørsted_as_ml_engineer"),
+        ("../..", "Data Scientist", "data_scientist"),
+        ("../..", "///", None),
+    ];
+    for (company, role, expected) in cases {
         with self.subTest(company=company, role=role) {
-            name: any = self.derive(company, role);
-            self.assertEqual(name, expected);
-            if name is None {
-                continue;
-            }
-            self.assertNotIn("/", name);
-            self.assertNotIn("..", name);
+            self.assertEqual(derive(company, role), expected);
         }
     }
 }

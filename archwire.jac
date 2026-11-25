@@ -24,7 +24,22 @@ graph import {
         save_state,
         tracker_pairs,
     }
-    tests._tools ++> tests.test_apply_records_application { tool }
+    tests._tools ++> tests._specs { tool }
+    tests._specs ++> tests.test_apply_records_application {
+        APPLY,
+        ASSISTANT,
+        GMAIL_SYNC,
+        HTML_REPORT,
+        INTERVIEW,
+        NOTION_SYNC,
+        OUTCOME,
+        SCRAPER,
+        doc,
+        expect,
+        expect_all,
+        lint_skills_passes,
+        section,
+    }
     tests._tools ++> tests.test_check_framework_version { root_at, tool }
     tests._tools ++> tests.test_check_upstream_updates { root_at, tool }
     salary_lookup ++> tests.test_convert_salary_excel { format_entry }
