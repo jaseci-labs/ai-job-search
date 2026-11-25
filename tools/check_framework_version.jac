@@ -1,50 +1,33 @@
-"""CI check: ensure that modified framework files have updated version markers.
+"""CI check: every framework file carries a 'framework_version' frontmatter key,
+and none is modified in git without that version being bumped.
 
-Fails if any markdown file under .claude/skills/job-application-assistant/ is
-modified in git without a change/bump to its 'framework_version' frontmatter key.
-Also ensures all framework files have a valid 'framework_version' frontmatter key.
+Framework files are the markdown files of .claude/skills/job-application-assistant/ and AGENTS.md.
 """
 
-import operator;
-
-import from __future__ { annotations }
-
 import os;
-
 import re;
-
 import subprocess;
-
 import sys;
-
 import from pathlib { Path }
 
-glob ROOT: any;
-
-glob SKILL_DIR: any;
-
-glob FRAMEWORK_FILES: any;
-
-glob root_agents: any;
-
-with entry {
-    ROOT = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent);
-    SKILL_DIR = ROOT / ".claude/skills/job-application-assistant";
-    FRAMEWORK_FILES = sorted(SKILL_DIR.glob("*.md"));
-    root_agents = ROOT / "AGENTS.md";
-    if root_agents.exists() {
-        FRAMEWORK_FILES.append(root_agents);
-    }
-}
+glob ROOT: Path = Path(os.environ.get("JOBSEARCH_ROOT") or Path(__file__).resolve().parent.parent),
+     SKILL_DIR: Path = ROOT / ".claude/skills/job-application-assistant",
+     FRAMEWORK_FILES: list[Path] = sorted(SKILL_DIR.glob("*.md")) + [
+         p
+         for p in [ROOT / "AGENTS.md"]
+         if p.exists()
+     ],
+     VERSION_LINE: str = "^framework_version\\s*:";
 
 def run_git(args: list[str]) -> tuple[int, str, str];
 
+"""The ref to diff against: the pull request's base, the previous commit in CI, else HEAD."""
 def get_base_commit -> str | None;
 
-def parse_frontmatter(path: Path) -> dict;
+def parse_frontmatter(path: Path) -> dict[str, str];
+def parse_frontmatter_text(text: str) -> dict[str, str];
 
-def parse_frontmatter_text(text: str) -> dict;
-
+"""Whether the file changed since base_commit without its framework_version changing."""
 def has_non_trivial_changes(file_path: Path, base_commit: str) -> bool;
 
 def main -> int;
