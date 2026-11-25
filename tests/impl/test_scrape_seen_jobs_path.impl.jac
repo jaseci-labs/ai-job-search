@@ -1,9 +1,10 @@
-impl ScrapeSeenJobsPathSpec.test_no_bare_seen_jobs_reference -> any {
+impl ScrapeSeenJobsPathSpec.test_no_bare_seen_jobs_reference {
     for spec in SPECS {
-        with self.subTest(spec=spec.relative_to(ROOT).as_posix()) {
-            offenders: any = [
+        with self.subTest(spec=spec) {
+            lines: list[str] = (ROOT / spec).read_text(encoding="utf-8").splitlines();
+            offenders: list[str] = [
                 f"line {i}: {line.strip()[:90]}"
-                for (i, line) in enumerate(spec.read_text(encoding="utf-8").splitlines(), 1)
+                for (i, line) in enumerate(lines, 1)
                 if BARE.search(line)
             ];
             self.assertEqual(

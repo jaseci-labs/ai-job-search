@@ -5,37 +5,42 @@ pass the enriched entries to `store`. Both commands deduplicate against the
 current history and tracker; `store` writes the history atomically.
 """
 
-import builtins;
-
-import operator;
-
 import argparse;
-
 import json;
-
 import sys;
-
 import from pathlib { Path }
-
 import from urllib.parse { urlsplit }
 
-def read_jobs(path: Path) -> builtins.list;
+glob STORED_FIELDS: tuple[str, ...] = (
+    "first_seen",
+    "posted_date",
+    "deadline",
+    "fit",
+    "status",
+    "portal",
+    "source",
+);
 
-def identity(
-    job: builtins.dict
-) -> builtins.tuple[builtins.str, builtins.tuple[builtins.str, builtins.str]];
+def read_jobs(path: Path) -> list[any];
 
+"""A hit's normalised URL and (company, title) pair; ValueError when it is not a posting."""
+def identity(job: any) -> tuple[str, tuple[str, str]];
+
+"""The hits not in the history, the tracker or earlier in the batch, by key, and the counts."""
 def select(
-    jobs: builtins.list,
-    seen: builtins.dict,
-    tracker: builtins.set,
-    *,
-    strict: builtins.bool = False,
-) -> builtins.tuple[builtins.list[builtins.dict], builtins.dict];
+    jobs: list[any], seen: dict[str, any], tracker: set[tuple[str, str]], *, strict: bool = False
+) -> tuple[dict[str, any], dict[str, any]];
 
-def run(args) -> builtins.int;
+def on_domain(url: any, domain: str) -> bool;
 
-def main -> builtins.int;
+"""Stored entries from a portal, or from its domain when they predate the portal field."""
+def prior_entries(seen: dict[str, any], portal: str, domain: str) -> int;
+
+def check_storable(job: dict[str, any]) -> None;
+
+def run(args: any) -> int;
+
+def main -> int;
 
 with entry:__main__ {
     sys.exit(main());

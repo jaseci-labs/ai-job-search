@@ -1,31 +1,32 @@
-impl read_jobs(path: Path) -> builtins.list {
+impl read_jobs(path: Path) -> list[any] {
     try {
         data: any = json.loads(path.read_text(encoding="utf-8"));
     } except (OSError, json.JSONDecodeError) as exc {
         raise ValueError(f"cannot read {path}: {exc}") from exc;
     }
-    if isinstance(data, `dict) {
+    if isinstance(data, dict) {
         data = data.get("results");
     }
-    if not isinstance(data, `list) {
+    if not isinstance(data, list) {
         raise ValueError("results must be a JSON array of jobs");
     }
     return data;
 }
 
-impl identity(
-    job: builtins.dict
-) -> builtins.tuple[builtins.str, builtins.tuple[builtins.str, builtins.str]] {
+impl identity(job: any) -> tuple[str, tuple[str, str]] {
+    if not isinstance(job, dict) {
+        raise ValueError("job is not an object");
+    }
     for field in ("title", "url") {
-        if not isinstance(job.get(field), `str) or not job[field].strip() {
+        if not isinstance(job.get(field), str) or not job[field].strip() {
             raise ValueError(f"job needs a non-empty {field}");
         }
     }
     company: any = job.get("company");
-    if company is not None and not isinstance(company, `str) {
+    if company is not None and not isinstance(company, str) {
         raise ValueError("job has a non-string company");
     }
-    url: any = job["url"].strip();
+    url: str = job["url"].strip();
     parsed: any = urlsplit(url);
     if parsed.scheme not in ("http", "https") or not parsed.netloc {
         raise ValueError(f"job has an invalid posting URL: {url}");
@@ -34,173 +35,135 @@ impl identity(
 }
 
 impl select(
-    jobs: builtins.list,
-    seen: builtins.dict,
-    tracker: builtins.set,
-    *,
-    strict: builtins.bool = False,
-) -> builtins.tuple[builtins.list[builtins.dict], builtins.dict] {
-    urls: any;
-    pairs: any;
-    (urls, pairs) = (set[any](), set[any]());
-    for `entry in seen.values() {
-        if not isinstance(`entry, `dict) {
-            raise ValueError("job_scraper/seen_jobs.json contains a non-object entry");
-        }
-        if isinstance(`entry.get("url"), `str) {
-            urls.add(`entry["url"].rstrip("/"));
-        }
-        pairs.add((norm(`entry.get("company")), norm(`entry.get("title"))));
-    }
-    selected: any = [];
-    counts: any = {"already_seen": 0, "already_applied": 0, "repeated_in_batch": 0, "invalid": []};
-    batch_urls: any;
-    batch_pairs: any;
-    batch_keys: any;
-    (batch_urls, batch_pairs, batch_keys) = (set[any](), set[any](), set[any]());
+    jobs: list[any], seen: dict[str, any], tracker: set[tuple[str, str]], *, strict: bool = False
+) -> tuple[dict[str, any], dict[str, any]] {
+    urls: set[str] = {
+        job["url"].rstrip("/")
+        for job in seen.values()
+        if isinstance(job.get("url"), str)
+    };
+    pairs: set[tuple[str, str]] = {
+        (norm(job.get("company")), norm(job.get("title")))
+        for job in seen.values()
+    };
+    fresh: dict[str, any] = {};
+    batch: set[any] = set();
+    counts: dict[str, any] = {
+        "already_seen": 0,
+        "already_applied": 0,
+        "repeated_in_batch": 0,
+        "invalid": [],
+    };
     for (index, job) in enumerate(jobs) {
         try {
-            if not isinstance(job, `dict) {
-                raise ValueError("job is not an object");
-            }
-            url: any;
-            pair: any;
-            (url, pair) = identity(job) as any;
+            (url, pair) = identity(job);
         } except ValueError as exc {
             if strict {
                 raise ValueError(f"job {index + 1}: {exc}") from exc;
             }
-            counts["invalid"].append({"index": index, "error": `str(exc)});
+            counts["invalid"].append({"index": index, "error": str(exc)});
             continue;
         }
-        key: any = make_key(job["company"], job["title"], job["url"]);
+        key: str = make_key(job["company"], job["title"], job["url"]);
         if url in urls or pair in pairs or key in seen {
             counts["already_seen"] += 1;
         } elif pair in tracker {
             counts["already_applied"] += 1;
-        } elif url in batch_urls or pair in batch_pairs or key in batch_keys {
+        } elif url in batch or pair in batch or key in fresh {
             counts["repeated_in_batch"] += 1;
         } else {
-            selected.append(job);
-            batch_urls.add(url);
-            batch_pairs.add(pair);
-            batch_keys.add(key);
+            fresh[key] = job;
+            batch.update([url, pair]);
         }
     }
-    return (selected, counts);
+    return (fresh, counts);
 }
 
-impl run(args) -> builtins.int {
+impl on_domain(url: any, domain: str) -> bool {
+    try {
+        host: str = (urlsplit(url if isinstance(url, str) else "").hostname or "").lower();
+    } except ValueError {
+        return False;
+    }
+    return host == domain or host.endswith("." + domain);
+}
+
+impl prior_entries(seen: dict[str, any], portal: str, domain: str) -> int {
+    return len([
+        job
+        for job in seen.values()
+        if job.get("portal") == portal
+            or not job.get("portal") and on_domain(job.get("url"), domain)
+    ]);
+}
+
+impl check_storable(job: dict[str, any]) -> None {
+    for field in STORED_FIELDS {
+        if field not in job {
+            raise ValueError(f"job needs {field} before storage");
+        }
+    }
+    if job["fit"] not in ("high", "medium", "low")
+        or job["status"] not in ("new", "skipped", "expired")
+    {
+        raise ValueError("job has an invalid fit or status");
+    }
+    if job["source"] not in ("cli", "websearch") or not isinstance(job["portal"], str) {
+        raise ValueError("job has an invalid portal or source");
+    }
+}
+
+impl run(args: any) -> int {
+    seen: dict[str, any] = {};
+    doc: dict[str, any] = {"seen": seen};
     if args.state.exists() {
-        doc: any;
-        seen: any;
-        (doc, seen) = load_state(args.state) as any;
-    } else {
-        doc = {"seen": {}};
-        seen = doc["seen"];
+        (doc, seen) = load_state(args.state);
     }
     if args.command == "history" {
-        domain: any = (args.domain or "").lower().strip(".");
+        domain: str = (args.domain or "").lower().strip(".");
         if not args.portal or not domain {
             raise ValueError("history needs --portal and --domain");
         }
-        count: any = 0;
-        for `entry in seen.values() {
-            if not isinstance(`entry, `dict) {
-                continue;
-            }
-            if `entry.get("portal") == args.portal {
-                count += 1;
-            } elif not `entry.get("portal") {
-                url: any = `entry.get("url");
-                try {
-                    host: any = (
-                        urlsplit(url if isinstance(url, `str) else "").hostname or ""
-                    ).lower();
-                } except ValueError {
-                    continue;
-                }
-                if host == domain or host.endswith("." + domain) {
-                    count += 1;
-                }
-            }
-        }
-        print(json.dumps({"portal": args.portal, "prior_entries": count}));
+        print(
+            json.dumps({
+                "portal": args.portal,
+                "prior_entries": prior_entries(seen, args.portal, domain),
+            }),
+        );
         return 0;
     }
-
-    jobs: any = read_jobs(args.results);
-    selected: any;
-    counts: any;
-    (selected, counts) = select(
-        jobs, seen, tracker_pairs(args.tracker), strict=operator.eq(args.command, "store")
-    ) as any;
+    (fresh, counts) = select(
+        read_jobs(args.results), seen, tracker_pairs(args.tracker), strict=args.command == "store"
+    );
     if args.command == "candidates" {
-        print(json.dumps({"selected": selected, **counts}, ensure_ascii=False));
+        print(json.dumps({"selected": list(fresh.values()), **counts}, ensure_ascii=False));
         return 0;
     }
-
-    added: any = [];
-    for job in selected {
-        for field in (
-            "first_seen",
-            "posted_date",
-            "deadline",
-            "fit",
-            "status",
-            "portal",
-            "source",
-        ) {
-            if field not in job {
-                raise ValueError(f"job needs {field} before storage");
-            }
-        }
-        if job["fit"] not in ("high", "medium", "low")
-            or job["status"] not in ("new", "skipped", "expired")
-        {
-            raise ValueError("job has an invalid fit or status");
-        }
-        if job["source"] not in ("cli", "websearch") or not isinstance(job["portal"], `str) {
-            raise ValueError("job has an invalid portal or source");
-        }
-        key: any = make_key(job["company"], job["title"], job["url"]);
-        if key in seen {
-            counts["already_seen"] += 1;
-            continue;
-        }
-        seen[key] = job;
-        added.append(key);
+    for job in fresh.values() {
+        check_storable(job);
     }
-    if added {
+    if fresh {
+        seen.update(fresh);
         args.state.parent.mkdir(parents=True, exist_ok=True);
         save_state(args.state, doc);
     }
-    print(json.dumps({"added": added, **counts}, ensure_ascii=False));
+    print(json.dumps({"added": list(fresh), **counts}, ensure_ascii=False));
     return 0;
 }
 
-impl main -> builtins.int {
+impl main -> int {
     _force_utf8_output();
-    parser: any = argparse.ArgumentParser(description=__doc__.splitlines()[0]);
+    parser: argparse.ArgumentParser = argparse.ArgumentParser(description=__doc__.splitlines()[0]);
     parser.add_argument("command", choices=("candidates", "store", "history"));
     parser.add_argument("--results", type=Path);
     parser.add_argument("--portal");
     parser.add_argument("--domain");
     args: any = parser.parse_args();
-    items_: any = list((STATE, TRACKER));
-    if len(items_) != 2 {
-        raise ValueError(
-            f"too many values to unpack (expected 2, got {len(items_)})"
-                if len(items_) > 2
-                else f"not enough values to unpack (expected 2, got {len(items_)})",
-        );
+    (args.state, args.tracker) = (STATE, TRACKER);
+    if args.command != "history" and args.results is None {
+        parser.error("candidates and store need --results");
     }
-    args.state = items_[0];
-    args.tracker = items_[1];
     try {
-        if args.command != "history" and args.results is None {
-            parser.error("candidates and store need --results");
-        }
         return run(args);
     } except ValueError as exc {
         print(f"scrape_state: {exc}", file=sys.stderr);
